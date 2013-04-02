@@ -18,8 +18,8 @@ setup(
     entry_points = {
         'console_scripts': ['git-tkt = gittkt.gittkt:main']
         },
-#    data_files = [
-#        ('git-tkt',['LICENSE','README'])
-#        ],
+    data_files = [
+        ('git-tkt',['LICENSE','README'])
+        ],
     )
 

@@ -1,0 +1,30 @@
+git-tkt
+
+git-tkt is (yet another) distributed ticket tracking system for git.
+
+I tried using git-issues and git-issius, both of which were broken.  After
+making several changes in the code of both, I decided to write my own.
+
+Advantages:
+
+* git-tkt has dynamically reads the fields your tickets can have.  This means by editing a config file, you can store whatever data you like within the ticket (e.g. name, status, author, department, etc).
+* git-tkt also allows any field to be set via the command line (e.g. --name, --author) or interactively.
+* written as a 'stand-alone' python script (though gitshelve needs to be available)
+* written for python 2 AND python 3.
+
+Installation:
+
+git-tkt can be installed with setup.py in the standard way.
+python setup.py install
+Note: the current directory MUST be the directory that setup.py lives in.  This is a limitation of setuptools/distutils.
+
+Usage:
+
+git-tkt help
+git-tkt <command> help
+
+Development:
+
+git-tkt uses the TicketField class to store field information.  Field information includes the name of the field, the default data, the help text, and the title for displaying the field.  This allows us to dynamically generate a list of TicketFields and display them in the help documentation and the interactive sessions.
+
+git-tkt uses gitshelve to store the ticket data in a separate branch, the same way git-issues and git-issius do.

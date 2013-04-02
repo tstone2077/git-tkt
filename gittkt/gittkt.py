@@ -13,6 +13,13 @@ import sys
 GIT_TKT_VERSION=0.1
 GIT_TKT_DEFAULT_BRANCH='git-tkt'
 
+#python 2 and 3 compatibility
+try:
+    raw_input
+except NameError:
+    import builtins
+    builtins.raw_input = builtins.input
+
 class TicketField:
     """
     A field that can be stored in the ticket.
@@ -22,14 +29,21 @@ class TicketField:
     title   = None
     default = None
     value   = None
-    def __init__(self,name,title,default,help):
+    def __init__(self,name,title,default,help,value=None):
         self.name = name
         self.title = title
         self.default = default
         self.help = help
+        self.value = value
 
     def setValue(self,value):
         self.value = value
+
+def GetGitUser():
+    return "%s <%s>"%(
+        gitshelve.git("config","user.name"),
+        gitshelve.git("config","user.email"),
+    )
 
 def LoadFields():
     """
@@ -49,7 +63,8 @@ def LoadFields():
     fields.append(TicketField(name = "author",
                 title = "Author",
                 help = "The author of the ticket",
-                default = "me",
+                default="",
+                value = GetGitUser(),
                 ))
     return fields
 
@@ -60,7 +75,7 @@ def newTicket(fields,branch = GIT_TKT_DEFAULT_BRANCH):
     data = {}
     for field in fields:
         if field.value is None:
-            inputStr = input("%s [%s]: "%(field.title,field.default))
+            inputStr = raw_input("%s [%s]: "%(field.title,field.default))
             if len(inputStr) == 0:
                 data[field.name] = field.default
             else:
@@ -74,7 +89,6 @@ def newTicket(fields,branch = GIT_TKT_DEFAULT_BRANCH):
     shelfData.sync()
     shelfData.close()
     print(data)
-
 
 def main():
     """
@@ -119,7 +133,9 @@ def main():
     print(parseResults)
     if parseResults.subparser in ['new']:
         for field in fields:
-            field.setValue(getattr(parseResults,field.name))
+            value = getattr(parseResults,field.name)
+            if value is not None:
+                field.setValue(value)
 
     if parseResults.subparser == 'help':
         parser.print_help()
