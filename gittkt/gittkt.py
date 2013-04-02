@@ -88,11 +88,20 @@ def newTicket(fields,branch = GIT_TKT_DEFAULT_BRANCH):
     shelfData = gitshelve.open(branch=branch)
     uuid._uuid_generate_time = None
     uuid._uuid_generate_random = None
-    uuId = str(uuid.uuid4())
-    shelfData[uuId] = str(data)
-    shelfData.commit("Adding Ticket %s"%uuId)
+    ticketId = str(uuid.uuid4())
+    shelfData[ticketId] = str(data)
+    message = "Added Ticket %s"%ticketId
+    shelfData.commit(message)
     shelfData.close()
     print(json.dumps(data))
+    print(message)
+
+def show(ticketIds,field,branch = GIT_TKT_DEFAULT_BRANCH):
+    shelfData = gitshelve.open(branch=branch)
+    for ticketId in ticketIds:
+        data = eval(shelfData[ticketId])
+        print(data)
+    shelfData.close()
 
 def main():
     """
@@ -130,6 +139,16 @@ def main():
         newParser.add_argument("--%s"%field.name,help = helpStr)
     newParser.add_argument('help',help = commandHelpMessage,nargs='?')
 
+    #---------------------------------------------
+    # show command
+    #---------------------------------------------
+    showParser = helpSubParsers.add_parser('show',help = 'show information of an existing ticket.')
+    for field in fields:
+        helpStr = "%s"%(field.help)
+        showParser.add_argument("--%s"%field.name,help = helpStr)
+    showParser.add_argument('help',help = commandHelpMessage,nargs='?')
+    showParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
+
     #____________________________________________
     # Parse the command line
     #____________________________________________
@@ -144,12 +163,18 @@ def main():
     if parseResults.subparser == 'help':
         parser.print_help()
         sys.exit(0)
-    if parseResults.subparser == 'new':
+    elif parseResults.subparser == 'new':
         if parseResults.help:
             newParser.print_help()
             sys.exit(0)
         else:
-            newTicket(fields)
+            newTicket(fields,parseResults.branch)
+    elif parseResults.subparser == 'show':
+        if 'help' in parseResults.ticketId:
+            showParser.print_help()
+            sys.exit(0)
+        else:
+            show(parseResults.ticketId,fields,parseResults.branch)
 
 if __name__ == '__main__':
     main()
