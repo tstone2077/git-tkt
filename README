@@ -25,6 +25,6 @@ git-tkt <command> help
 
 Development:
 
-git-tkt uses the TicketField class to store field information.  Field information includes the name of the field, the default data, the help text, and the title for displaying the field.  This allows us to dynamically generate a list of TicketFields and display them in the help documentation and the interactive sessions.
+git-tkt uses the TicketField class to store field information.  Field information includes the name of the field, the default data, the help text, and the title for displaying the field.  This allows us to dynamically generate a list of TicketFields and display them in the help documentation and the interactive sessions. To make a field non-interactive (such as author) then 'value' can be set.
 
 git-tkt uses gitshelve to store the ticket data in a separate branch, the same way git-issues and git-issius do.

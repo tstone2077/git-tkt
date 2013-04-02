@@ -8,7 +8,9 @@
 import os
 import argparse
 import gitshelve
+import json
 import sys
+import uuid
 
 GIT_TKT_VERSION=0.1
 GIT_TKT_DEFAULT_BRANCH='git-tkt'
@@ -84,11 +86,13 @@ def newTicket(fields,branch = GIT_TKT_DEFAULT_BRANCH):
             data[field.name] = field.value
     #store the new data in gitshelve
     shelfData = gitshelve.open(branch=branch)
-    shelfData['1'] = str(data)
-    shelfData.commit("Adding Ticket")
-    shelfData.sync()
+    uuid._uuid_generate_time = None
+    uuid._uuid_generate_random = None
+    uuId = str(uuid.uuid4())
+    shelfData[uuId] = str(data)
+    shelfData.commit("Adding Ticket %s"%uuId)
     shelfData.close()
-    print(data)
+    print(json.dumps(data))
 
 def main():
     """
