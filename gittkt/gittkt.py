@@ -4,9 +4,11 @@
 #TODO: Make LoadFields dynamic, so people can customize the fields stored
 #TODO: Change input() to support multiple lines for some fields (such as 
 #      description)
-import sys
-import gitshelve
+
+import os
 import argparse
+import gitshelve
+import sys
 
 GIT_TKT_VERSION=0.1
 GIT_TKT_DEFAULT_BRANCH='git-tkt'
@@ -80,7 +82,9 @@ def main():
     """
     commandHelpMessage = 'show this help message and exit'
     fields = LoadFields()
-    parser = argparse.ArgumentParser(description='Git ticket tracking system')
+    versionStr = "%s %s"%(os.path.basename(sys.argv[0]),str(GIT_TKT_VERSION))
+    parser = argparse.ArgumentParser(description='Git ticket tracking system',
+                                     version=versionStr)
     #---------------------------------------------
     # Global arguments
     #---------------------------------------------
