@@ -4,16 +4,22 @@
 #TODO: Make LoadFields dynamic, so people can customize the fields stored
 #TODO: Change input() to support multiple lines for some fields (such as 
 #      description)
+#TODO: when giving multiple arguments to show, the first argument is ignored
+#      since it is part of the 'help' attribute instead of 'ticketIds'
 
 import os
 import argparse
 import gitshelve
 import json
+import re
+import sqlite3
 import sys
 import uuid
 
 GIT_TKT_VERSION=0.1
 GIT_TKT_DEFAULT_BRANCH='git-tkt'
+GIT_TKT_NUM_MAP_FILE='numbers.txt'
+MIN_UUID_LENGTH=30
 
 #python 2 and 3 compatibility
 try:
@@ -21,6 +27,8 @@ try:
 except NameError:
     import builtins
     builtins.raw_input = builtins.input
+
+class GitTktError(Exception):pass
 
 class TicketField:
     """
@@ -70,38 +78,118 @@ def LoadFields():
                 ))
     return fields
 
-def newTicket(fields,branch = GIT_TKT_DEFAULT_BRANCH):
-    """
-    Create a new ticket.
-    """
-    data = {}
-    for field in fields:
-        if field.value is None:
-            inputStr = raw_input("%s [%s]: "%(field.title,field.default))
-            if len(inputStr) == 0:
-                data[field.name] = field.default
-            else:
-                data[field.name] = inputStr
-        else:
-            data[field.name] = field.value
-    #store the new data in gitshelve
-    shelfData = gitshelve.open(branch=branch)
-    uuid._uuid_generate_time = None
-    uuid._uuid_generate_random = None
-    ticketId = str(uuid.uuid4())
-    shelfData[ticketId] = str(data)
-    message = "Added Ticket %s"%ticketId
-    shelfData.commit(message)
-    shelfData.close()
-    print(json.dumps(data))
-    print(message)
+class GitTkt:
+    fields  = []
+    branch  = GIT_TKT_DEFAULT_BRANCH
+    nextNum = 0
+    numMap = None
 
-def show(ticketIds,field,branch = GIT_TKT_DEFAULT_BRANCH):
-    shelfData = gitshelve.open(branch=branch)
-    for ticketId in ticketIds:
-        data = eval(shelfData[ticketId])
-        print(data)
-    shelfData.close()
+    def __init__(self, fields = None, branch = None):
+        if fields is not None:
+            self.fields = fields
+        if branch is not None:
+            self.branch = branch
+
+    def new(self):
+        """
+        Create a new ticket.
+        """
+        data = {}
+        for field in self.fields:
+            if field.value is None:
+                inputStr = raw_input("%s [%s]: "%(field.title,field.default))
+                if len(inputStr) == 0:
+                    data[field.name] = field.default
+                else:
+                    data[field.name] = inputStr
+            else:
+                data[field.name] = field.value
+        uuid._uuid_generate_time = None
+        uuid._uuid_generate_random = None
+        ticketId = str(uuid.uuid4())
+        message = "Added Ticket %s"%ticketId
+        #ticket = ticketId : data
+        #store the new data in gitshelve
+        self._SaveToShelf(ticketId,data,message)
+        self._AddToNumMap(ticketId)
+        self._UpdateDatabase(ticketId,data)
+        print("Added Ticket #%d (%s)"%(self.nextNum,ticketId))
+
+    def _GetTicketIds(self,num):
+        localNum = None
+        ticketId = None
+        if len(num) < MIN_UUID_LENGTH: 
+            #we can assume this is a not uuid
+            searchRE = re.compile("(?P<num>%s)\t(?P<ticketId>.*)"%num)
+        else:
+            searchRE = re.compile("(?P<num>[0-9]+)\t(?P<ticketId>%s)"%num)
+
+        self._LoadNumMap()
+        matchObj = None
+        if len(self.numMap) > 0:
+            matchObj = searchRE.search(self.numMap)
+        if matchObj is not None:
+            localNum = int(matchObj.group('num'))
+            ticketId = matchObj.group('ticketId')
+        return localNum,ticketId
+
+    def _LoadNumMap(self):
+        if self.numMap is None:
+            shelfData = gitshelve.open(branch=self.branch)
+            try:
+                self.numMap = shelfData[GIT_TKT_NUM_MAP_FILE]
+            except KeyError:
+                #reading from the shelf failed, so we have to start new
+                self.numMap = ""
+            shelfData.close()
+
+    def _AddToNumMap(self,ticketId):
+        #TODO: Cache the map
+        self._LoadNumMap()
+        
+        #attempt to read it from te shelf
+        if self._GetTicketIds(ticketId) == (None,None) and len(self.numMap) > 0:
+            lastEntry = self.numMap.split("\n")[-2]
+            self.nextNum = int(lastEntry[:lastEntry.find("\t")])
+            
+        self.nextNum += 1
+        self.numMap += "%d\t%s\n"%(self.nextNum,ticketId)
+        commitMsg = "Updating map with %d %s"%(self.nextNum, ticketId)
+        shelfData = gitshelve.open(branch=self.branch)
+        shelfData[GIT_TKT_NUM_MAP_FILE] = self.numMap
+        shelfData.commit(commitMsg)
+        shelfData.close()
+
+    def _UpdateDatabase(self,ticketId,data):
+        #update the in memory sqlite3 database for faster queries
+        pass
+
+    def _SaveToShelf(self,ticketId,data,message):
+        shelfData = gitshelve.open(branch=self.branch)
+        shelfData['active/%s'%ticketId] = str(data)
+        shelfData.commit(message)
+        shelfData.close()
+
+    def archive(self,ticketIds):
+        #move ticketId from the active directory to the archived
+        #archived tickets are not loaded by default.  They can be
+        #loaded and queried if needed.
+        pass
+
+    def show(self,ticketIds):
+        shelfData = gitshelve.open(branch=self.branch)
+        for ticketId in ticketIds:
+            local,uuid = self._GetTicketIds(ticketId)
+            if uuid is None:
+                raise GitTktError("Ticket not found: %s"%ticketId)
+            ticketData = eval(shelfData["active/%s"%uuid])
+            print("-"*30)
+            print("Ticket %d (%s)"%(local,uuid))
+            for key,value in ticketData.items():
+                print("  %s = %s"%(key.upper(),value))
+            print("-"*30)
+            print
+        shelfData.close()
 
 def main():
     """
@@ -143,9 +231,6 @@ def main():
     # show command
     #---------------------------------------------
     showParser = helpSubParsers.add_parser('show',help = 'show information of an existing ticket.')
-    for field in fields:
-        helpStr = "%s"%(field.help)
-        showParser.add_argument("--%s"%field.name,help = helpStr)
     showParser.add_argument('help',help = commandHelpMessage,nargs='?')
     showParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
 
@@ -154,27 +239,31 @@ def main():
     #____________________________________________
     parseResults = parser.parse_args(sys.argv[1:])
     print(parseResults)
-    if parseResults.subparser in ['new']:
+    if parseResults.subparser != 'help':
         for field in fields:
-            value = getattr(parseResults,field.name)
-            if value is not None:
-                field.setValue(value)
+            try:
+                value = getattr(parseResults,field.name)
+                if value is not None:
+                    field.setValue(value)
+            except AttributeError:
+                pass
 
+    tkt = GitTkt(fields,parseResults.branch)
     if parseResults.subparser == 'help':
         parser.print_help()
         sys.exit(0)
-    elif parseResults.subparser == 'new':
+    if parseResults.subparser == 'new':
         if parseResults.help:
             newParser.print_help()
             sys.exit(0)
         else:
-            newTicket(fields,parseResults.branch)
+            tkt.new()
     elif parseResults.subparser == 'show':
         if 'help' in parseResults.ticketId:
             showParser.print_help()
             sys.exit(0)
         else:
-            show(parseResults.ticketId,fields,parseResults.branch)
+            tkt.show(parseResults.ticketId)
 
 if __name__ == '__main__':
     main()

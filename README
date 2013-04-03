@@ -28,3 +28,28 @@ Development:
 git-tkt uses the TicketField class to store field information.  Field information includes the name of the field, the default data, the help text, and the title for displaying the field.  This allows us to dynamically generate a list of TicketFields and display them in the help documentation and the interactive sessions. To make a field non-interactive (such as author) then 'value' can be set.
 
 git-tkt uses gitshelve to store the ticket data in a separate branch, the same way git-issues and git-issius do.
+
+git-tkt loads the data from the shelf to an in memory sqlite database.  From the database, the user can run queries.  When changes occur, they are stored in both the in memory database AND the shelf (for persistence and mergability).
+
+git-tkt uses unique id's, but also uses more human-usable ids.  These ids are generated and stored in a mapping file.  When issues are pulled and merged, the mapping file is updated and the tickets where the local id has changed are reported to the user.
+
+For example:
+alice's repo              |             bob's repo
+-----------------------------------------------------
+tkt #      tkt hash       | tkt #       tkt hash
+1          abcdef         | 1           abcdef
+2          ghijkl         | 2           ghijkl
+3          123456         | 3           uvwxzy
+
+after the merge:
+tkt#       tkt hash
+1          abcdef
+2          ghijkl
+3          uvwxzy
+4          123456
+
+since tkt 123456 has changed from 3 to 4, the report will show:
+
+tkt #3 (123456 "I found a bug") is now tkt #4
+
+TODO: Figure out a solution in the case that the mapping file and the shelved files get out of sync (maybe when the app crashes and only one is updated)
