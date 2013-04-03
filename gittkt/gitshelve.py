@@ -244,7 +244,7 @@ class gitshelve(dict):
         if not self.head:
             return
 
-        ls_tree = self.git('ls-tree', '-r', '-t', '-z', self.head).split('\0')
+        ls_tree = self.git('ls-tree', '--full-tree','-r', '-t', '-z', self.head).split('\0')
         for line in ls_tree:
             if not line:
                 continue
@@ -531,6 +531,12 @@ class gitshelve(dict):
 
     def iteritems(self):
         return self.walker('items', self.objects)
+
+    def items(self):
+        i = []
+        for items in self.iteritems():
+            i.append(items)
+        return i
 
     def keys(self):
         k = []
