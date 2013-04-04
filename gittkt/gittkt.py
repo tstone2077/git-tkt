@@ -34,17 +34,33 @@ class TicketField:
     """
     A field that can be stored in the ticket.
     """
-    name    = None
-    help    = None
-    title   = None
-    default = None
-    value   = None
-    def __init__(self,name,title,default,help,value=None):
+    name     = None
+    help     = None
+    title    = None
+    default  = None
+    value    = None
+    listInfo = False
+    def __init__(self,name,title,default,help,value=None,listInfo=False,
+                 interactive=True):
+        """
+        name = name of the field (e.g. name=status: becomes --status)
+        title = title of the field (used in interactive prompts and list 
+                table)
+        default = default value of the field (used in interactive prompts
+                  set if not passed on command line)
+        help = help text of the field (used in --help commands)
+        value = value of the field (set by the command line parser and used
+                in functions so the field data is complete)
+        listInfo = bool to say this value should be included in the list command
+        interactive = bool to say if this field should be interactive or not
+        """
         self.name = name
         self.title = title
         self.default = default
         self.help = help
         self.value = value
+        self.listInfo = listInfo
+        self.interactive = interactive
 
     def setValue(self,value):
         self.value = value
@@ -73,8 +89,8 @@ def LoadFields():
     fields.append(TicketField(name = "author",
                 title = "Author",
                 help = "The author of the ticket",
-                default="",
-                value = GetGitUser(),
+                default = GetGitUser(),
+                interactive = False,
                 ))
     return fields
 
@@ -96,7 +112,7 @@ class GitTkt:
         """
         data = {}
         for field in self.fields:
-            if field.value is None:
+            if field.interactive and field.value is None:
                 inputStr = raw_input("%s [%s]: "%(field.title,field.default))
                 if len(inputStr) == 0:
                     data[field.name] = field.default
@@ -191,6 +207,11 @@ class GitTkt:
             print
         shelfData.close()
 
+    def list(self):
+        #TODO: support query parameters
+        #TODO: use a screen formatting library
+        pass
+
 def main():
     """
     Function called when this file is called from the command line
@@ -234,6 +255,12 @@ def main():
     showParser.add_argument('help',help = commandHelpMessage,nargs='?')
     showParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
 
+    #---------------------------------------------
+    # list command
+    #---------------------------------------------
+    listParser = helpSubParsers.add_parser('list',help = 'display a list of all the tickets.')
+    listParser.add_argument('help',help = commandHelpMessage,nargs='?')
+
     #____________________________________________
     # Parse the command line
     #____________________________________________
@@ -243,6 +270,8 @@ def main():
         for field in fields:
             try:
                 value = getattr(parseResults,field.name)
+                if field.value is None and not field.interactive:
+                    value = field.default
                 if value is not None:
                     field.setValue(value)
             except AttributeError:
@@ -264,6 +293,12 @@ def main():
             sys.exit(0)
         else:
             tkt.show(parseResults.ticketId)
+    elif parseResults.subparser == 'list':
+        if parseResults.help:
+            listParser.print_help()
+            sys.exit(0)
+        else:
+            tkt.list()
 
 if __name__ == '__main__':
     main()
