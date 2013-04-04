@@ -40,10 +40,10 @@ class TicketField:
     title       = None
     default     = None
     value       = None
+    editable    = True
     listColSize = 0
-    interactive = True
-    def __init__(self,name,title,default,help,value=None,interactive=True,
-                 listColSize = None,order = None):
+    def __init__(self,name,title,default,help,value=None,editable=True,
+                 listColSize = None):
         """
         name = name of the field (e.g. name=status: becomes --status)
         title = title of the field (used in interactive prompts and list 
@@ -53,7 +53,7 @@ class TicketField:
         help = help text of the field (used in --help commands)
         value = value of the field (set by the command line parser and used
                 in functions so the field data is complete)
-        interactive = bool to say if this field should be interactive or not
+        editable = bool to say if this field can be edited or not
         listColSize = if this is a positive integer, this field will be shown in
                       the list command using the number of columns specified
         """
@@ -62,7 +62,7 @@ class TicketField:
         self.default = default
         self.help = help
         self.value = value
-        self.interactive = interactive
+        self.editable = editable
         self.listColSize = listColSize
 
     def setValue(self,value):
@@ -78,7 +78,7 @@ def LoadFields():
     """
     Load the fields that can be stored in a ticket.
     NOTE: the order in which this fields are loaded is the order that they are
-    presented in the list and show commands as well as the interactive display
+    presented in the list and show commands as well as the editable display
     """
     fields = []
     fields.append(TicketField(name = "name",
@@ -96,7 +96,7 @@ def LoadFields():
                 title = "Author",
                 help = "The author of the ticket",
                 default = GetGitUser(),
-                interactive = False,
+                editable = False,
                 listColSize = 11,
                 ))
     return fields
@@ -119,7 +119,7 @@ class GitTkt:
         """
         data = {}
         for field in self.fields:
-            if field.interactive and field.value is None:
+            if field.editable and field.value is None:
                 inputStr = raw_input("%s [%s]: "%(field.title,field.default))
                 if len(inputStr) == 0:
                     data[field.name] = field.default
@@ -189,6 +189,10 @@ class GitTkt:
         pass
 
     def _SaveToShelf(self,ticketId,data,message):
+        if data.has_key('uuid'):
+            del data['uuid']
+        if data.has_key('num'):
+            del data['num']
         shelfData = gitshelve.open(branch=self.branch)
         shelfData['active/%s'%ticketId] = str(data)
         shelfData.commit(message)
@@ -221,7 +225,8 @@ class GitTkt:
             print("-"*30)
             print("Ticket %d (%s)"%(ticketData['num'],ticketData['uuid']))
             for key,value in ticketData.items():
-                print("  %s = %s"%(key.upper(),value))
+                if key != 'num' and key != 'uuid':
+                    print("  %s = %s"%(key.upper(),value))
             print("-"*30)
             print
 
@@ -256,7 +261,25 @@ class GitTkt:
                         rowData.append("".ljust(colSize) + "|")
             print(''.join(rowData))
 
-def main():
+    def edit(self,ticketIds,interactive = True):
+        for ticketId in ticketIds:
+            ticketData = self._GetTicketData(ticketId)
+            for field in self.fields:
+                try:
+                    currentValue = ticketData[field.name]
+                except KeyError:
+                    currentValue = field.default
+                if field.value is None:
+                    if interactive and field.editable:
+                        inputStr = raw_input("%s [%s]: "%(field.title,currentValue))
+                        if len(inputStr) != 0:
+                            ticketData[field.name] = inputStr
+                else:
+                    ticketData[field.name] = field.value
+            message = "Editing ticket %s"%ticketData['uuid']
+            self._SaveToShelf(ticketData['uuid'],ticketData,message)
+
+def Main():
     """
     Function called when this file is called from the command line
     """
@@ -308,8 +331,22 @@ def main():
     # list command
     #---------------------------------------------
     listParser = helpSubParsers.add_parser('list',help = 'display a list of all'
-                                           ' the tickets.')
+                                           ' the tickets')
     listParser.add_argument('help',help = commandHelpMessage,nargs='?')
+
+    #---------------------------------------------
+    # edit command
+    #---------------------------------------------
+    editParser = helpSubParsers.add_parser('edit',help = 'edit a specific ticket')
+    editParser.add_argument("--non-interactive",
+                            help = "do not prompt for input if a value is not "
+                            "supplied on the command line",
+                            default = False, action = "store_true")
+    for field in fields:
+        if field.editable:
+            editParser.add_argument("--%s"%field.name,help = field.help)
+    editParser.add_argument('help',help = commandHelpMessage,nargs='?')
+    editParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
 
     #____________________________________________
     # Parse the command line
@@ -321,7 +358,7 @@ def main():
         for field in fields:
             try:
                 value = getattr(parseResults,field.name)
-                if field.value is None and not field.interactive:
+                if field.value is None and not field.editable:
                     value = field.default
                 if value is not None:
                     field.setValue(value)
@@ -374,23 +411,32 @@ def main():
         parser.print_help()
         sys.exit(0)
     if parseResults.subparser == 'new':
-        if parseResults.help:
+        if parseResults.help and 'help' in parseResults.help:
             newParser.print_help()
             sys.exit(0)
         else:
             tkt.new()
     elif parseResults.subparser == 'show':
-        if 'help' in parseResults.ticketId:
+        if parseResults.help and 'help' in parseResults.help:
             showParser.print_help()
             sys.exit(0)
         else:
             tkt.show(parseResults.ticketId)
     elif parseResults.subparser == 'list':
-        if parseResults.help:
+        if parseResults.help and 'help' in parseResults.help:
             listParser.print_help()
             sys.exit(0)
         else:
             tkt.list()
+    elif parseResults.subparser == 'edit':
+        if parseResults.help and 'help' in parseResults.help:
+            editParser.print_help()
+            sys.exit(0)
+        else:
+            tkt.edit(parseResults.ticketId, not parseResults.non_interactive)
 
 if __name__ == '__main__':
-    main()
+    #try:
+        Main()
+    #except Exception as e:
+    #    print("ERROR: %s"%str(e))
