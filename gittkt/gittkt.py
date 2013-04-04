@@ -7,10 +7,11 @@
 #TODO: when giving multiple arguments to show, the first argument is ignored
 #      since it is part of the 'help' attribute instead of 'ticketIds'
 
-import os
 import argparse
+import datetime
 import gitshelve
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -34,14 +35,15 @@ class TicketField:
     """
     A field that can be stored in the ticket.
     """
-    name     = None
-    help     = None
-    title    = None
-    default  = None
-    value    = None
-    listInfo = False
-    def __init__(self,name,title,default,help,value=None,listInfo=False,
-                 interactive=True):
+    name        = None
+    help        = None
+    title       = None
+    default     = None
+    value       = None
+    listColSize = 0
+    interactive = True
+    def __init__(self,name,title,default,help,value=None,interactive=True,
+                 listColSize = None,order = None):
         """
         name = name of the field (e.g. name=status: becomes --status)
         title = title of the field (used in interactive prompts and list 
@@ -51,16 +53,17 @@ class TicketField:
         help = help text of the field (used in --help commands)
         value = value of the field (set by the command line parser and used
                 in functions so the field data is complete)
-        listInfo = bool to say this value should be included in the list command
         interactive = bool to say if this field should be interactive or not
+        listColSize = if this is a positive integer, this field will be shown in
+                      the list command using the number of columns specified
         """
         self.name = name
         self.title = title
         self.default = default
         self.help = help
         self.value = value
-        self.listInfo = listInfo
         self.interactive = interactive
+        self.listColSize = listColSize
 
     def setValue(self,value):
         self.value = value
@@ -74,12 +77,15 @@ def GetGitUser():
 def LoadFields():
     """
     Load the fields that can be stored in a ticket.
+    NOTE: the order in which this fields are loaded is the order that they are
+    presented in the list and show commands as well as the interactive display
     """
     fields = []
     fields.append(TicketField(name = "name",
                 title = "Ticket Name",
                 help = "The name of the ticket",
                 default = "My Ticket",
+                listColSize = 33,
                 ))
     fields.append(TicketField(name = "description",
                 title = "Description",
@@ -91,6 +97,7 @@ def LoadFields():
                 help = "The author of the ticket",
                 default = GetGitUser(),
                 interactive = False,
+                listColSize = 11,
                 ))
     return fields
 
@@ -120,6 +127,7 @@ class GitTkt:
                     data[field.name] = inputStr
             else:
                 data[field.name] = field.value
+        data['creation_date'] = str(datetime.datetime.now())
         uuid._uuid_generate_time = None
         uuid._uuid_generate_random = None
         ticketId = str(uuid.uuid4())
@@ -192,25 +200,61 @@ class GitTkt:
         #loaded and queried if needed.
         pass
 
-    def show(self,ticketIds):
+    def _GetTicketData(self,ticketId,fieldNames = None):
+        local,uuid = self._GetTicketIds(ticketId)
+        if uuid is None:
+            raise GitTktError("Ticket not found: %s"%ticketId)
         shelfData = gitshelve.open(branch=self.branch)
+        returnData = ticketData = eval(shelfData["active/%s"%uuid])
+        if fieldNames is not None:
+            returnData = {}
+            for name in fieldNames:
+                returnData[name] = ticketData[name]
+        returnData['num'] = local
+        returnData['uuid'] = uuid
+        shelfData.close()
+        return returnData
+        
+    def show(self,ticketIds):
         for ticketId in ticketIds:
-            local,uuid = self._GetTicketIds(ticketId)
-            if uuid is None:
-                raise GitTktError("Ticket not found: %s"%ticketId)
-            ticketData = eval(shelfData["active/%s"%uuid])
+            ticketData = self._GetTicketData(ticketId)
             print("-"*30)
-            print("Ticket %d (%s)"%(local,uuid))
+            print("Ticket %d (%s)"%(ticketData['num'],ticketData['uuid']))
             for key,value in ticketData.items():
                 print("  %s = %s"%(key.upper(),value))
             print("-"*30)
             print
-        shelfData.close()
 
     def list(self):
         #TODO: support query parameters
         #TODO: use a screen formatting library
-        pass
+        self._LoadNumMap()
+        tickets = [ line.split("\t") for line in self.numMap.strip().split("\n") ]
+        
+        #print the columns
+        colData = ["#  |"]
+        for field in self.fields:
+            colSize = field.listColSize
+            if colSize > 0:
+                colStr = field.title[:colSize].center(colSize) + "|"
+                colData.append(colStr)
+        print(''.join(colData))
+
+        #print the ticket data
+        for ticket in tickets:
+            num="%s"%(ticket[0])
+            ticketData = self._GetTicketData(ticket[0])
+            rowData = [num.ljust(3) + "|"]
+            for field in self.fields:
+                colSize = field.listColSize
+                if colSize > 0:
+                    if ticketData[field.name]:
+                        rowData.append((" "+
+                            ticketData[field.name][:colSize-2]+
+                            " ").ljust(colSize) + "|")
+                    else:
+                        rowData.append("".ljust(colSize) + "|")
+            print(''.join(rowData))
 
 def main():
     """
