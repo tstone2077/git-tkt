@@ -224,6 +224,10 @@ def main():
     #---------------------------------------------
     # Global arguments
     #---------------------------------------------
+    parser.add_argument('--save',help='save the current global options for'
+                        ' future commands in the current repository',
+                        action = 'store_true',
+                        default = False)
     parser.add_argument('--branch',help='branch name to store tickets.  This'
                         ' branch never needs to be checked out.',
                         default = GIT_TKT_DEFAULT_BRANCH)
@@ -251,20 +255,23 @@ def main():
     #---------------------------------------------
     # show command
     #---------------------------------------------
-    showParser = helpSubParsers.add_parser('show',help = 'show information of an existing ticket.')
+    showParser = helpSubParsers.add_parser('show',help = 'show information of'
+                                           ' an existing ticket.')
     showParser.add_argument('help',help = commandHelpMessage,nargs='?')
     showParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
 
     #---------------------------------------------
     # list command
     #---------------------------------------------
-    listParser = helpSubParsers.add_parser('list',help = 'display a list of all the tickets.')
+    listParser = helpSubParsers.add_parser('list',help = 'display a list of all'
+                                           ' the tickets.')
     listParser.add_argument('help',help = commandHelpMessage,nargs='?')
 
     #____________________________________________
     # Parse the command line
     #____________________________________________
     parseResults = parser.parse_args(sys.argv[1:])
+
     print(parseResults)
     if parseResults.subparser != 'help':
         for field in fields:
@@ -277,6 +284,47 @@ def main():
             except AttributeError:
                 pass
 
+    #----------------------------------
+    # Read/write config file
+    #---------------------------------
+    gitRoot = gitshelve.git('rev-parse','--show-toplevel')
+    gitDir = os.path.join(gitRoot,'.git')
+    if os.path.isfile(gitDir):
+        #the repo was created with --separate-git-dir
+        with open(gitDir,'r') as file:
+           gitDir = file.read().split('gitdir: ')[1].strip()
+    
+    gittktConfDir = os.path.join(gitDir,'gittkt')
+    if not os.path.isdir(gittktConfDir):
+        os.makedirs(gittktConfDir)
+
+    gittktConf = os.path.join(gittktConfDir,'config')
+    confData = {}
+    if os.path.isfile(gittktConf):
+        with open(gittktConf,'r') as file:
+            try:
+                confData = eval(file.read())
+            except SyntaxError:
+                confData = {}
+    configurableData = ['branch']
+    if parseResults.save:
+        for data in configurableData:
+            value = getattr(parseResults,data)
+            confData[data] = value
+            print("Storing config data: --%s '%s'"%(data,confData[data]))
+            with open(gittktConf,'w') as file:
+                file.write(str(confData))
+    for data in configurableData:
+        if "--%s"%data not in sys.argv:
+            try:
+                print("Using config data: --%s '%s'"%(data,confData[data]))
+                setattr(parseResults,data,confData[data])
+            except KeyError:
+                pass
+        
+    #---------------------------------
+    # Handle parse results
+    #---------------------------------
     tkt = GitTkt(fields,parseResults.branch)
     if parseResults.subparser == 'help':
         parser.print_help()
