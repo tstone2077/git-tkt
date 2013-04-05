@@ -8,7 +8,9 @@
 #      since it is part of the 'help' attribute instead of 'ticketIds'
 
 import argparse
+from collections import OrderedDict
 import datetime
+from difflib import Differ
 import gitshelve
 import json
 import os
@@ -279,6 +281,147 @@ class GitTkt:
             message = "Editing ticket %s"%ticketData['uuid']
             self._SaveToShelf(ticketData['uuid'],ticketData,message)
 
+    def pull(self,remote,remoteBranch,keepLocal = True):
+        """
+        algorithm for merging local number ids:
+        when merging, 3 changes can happen:
+        1. item added: can be added at the end and renumbered accordingly
+        2. item removed (archived or un-archived):can be removed numbers not
+                reused unless it was the last item
+        3. item changed: happens if a renumbering occurred, in which the same
+                rules as added can apply
+
+        so, we want to fetch the latest from the remote.  This will then be
+        set to FETCH_HEAD.
+        From that point, we can preform a 3-way merge.  We diff the common 
+        ancestor with the 2 changed (FETCH_HEAD and self.branch).  This can
+        give us a list of added, removed, and changed
+
+        With that list, we can remove everything that needs to be removed from
+        the ancestor.  The user can determine if they want the remote numbering
+        to change or local numbering to change.  Either way, we can then add 
+        the new tickets to the end, ensuring that niether uuids or local ids
+        are duplicated.  
+
+        The result should be a merged list with tickets from both branches and
+        a new local numbering scheme based on the numbering scheme the user
+        wanted to keep.
+        """
+        gitshelve.git('fetch',remote,remoteBranch)
+        #update numbering
+        #attempt to read it from te shelf
+        self._LoadNumMap()
+        uuids = {}
+        remoteNumMap = gitshelve.git('cat-file','-p',
+                            "FETCH_HEAD:%s"%(GIT_TKT_NUM_MAP_FILE))
+        parentRev = gitshelve.git('merge-base','FETCH_HEAD',self.branch)
+        ancestorNumMap = gitshelve.git('cat-file','-p',
+                            "%s:%s"%(parentRev,GIT_TKT_NUM_MAP_FILE))
+
+        localLines = self.numMap.split("\n")
+        remoteLines = remoteNumMap.split("\n")
+        ancestorLines = ancestorNumMap.split("\n")
+
+        diff = Differ()
+        #find the differences
+        localChanges=[x for x in list(diff.compare(ancestorLines,localLines))
+                        if x[0] == '+' or x[0] =='-']
+        remoteChanges=[x for x in list(diff.compare(ancestorLines,remoteLines))
+                        if x[0] == '+' or x[0] =='-']
+        #assume we keep remote numbering and alter local numbering
+        firstChanges = remoteChanges
+        secondChanges = localChanges
+        first = 'remote'
+        second = 'local'
+        if keepLocal:
+            first = 'local'
+            second = 'remote'
+            firstChanges = localChanges
+            secondChanges = remoteChanges
+        print("Applying %s changes after %s changes"%(second,first))
+        #determine the changes that will be needed
+        removals = {}
+        removals['local'] = OrderedDict()
+        removals['remote'] = OrderedDict()
+        additions = {}
+        additions['local'] = OrderedDict()
+        additions['remote'] = OrderedDict()
+        ancestor = OrderedDict()
+        for line in ancestorNumMap.split("\n"):
+            if len(line) > 0:
+                ancestor[line.split('\t')[1]] = line.split('\t')[0]
+            elif line[0] == '+' and len(line) > 2: #this is an addition
+                additions[line[2:].split('\t')[1]] = line[2:].split('\t')[0]
+        for line in firstChanges:
+            if line[0] == '-' and len(line) > 2: #this is a removal
+                removals[first][line[2:].split('\t')[1]] = line[2:].split('\t')[0]
+            elif line[0] == '+' and len(line) > 2: #this is an addition
+                additions[first][line[2:].split('\t')[1]] = line[2:].split('\t')[0]
+        for line in secondChanges:
+            if line[0] == '-' and len(line) > 2: #this is a removal
+                removals[second][line[2:].split('\t')[1]] = line[2:].split('\t')[0]
+            elif line[0] == '+' and len(line) > 2: #this is an addition
+                additions[second][line[2:].split('\t')[1]] = line[2:].split('\t')[0]
+        #apply the changes
+        output = OrderedDict()
+        localIdsUsed = {}
+        maxValues = max(additions[first].values(),additions[second].values())
+        lastLocalId = 0#int(max(maxValues))
+        for uuid,localId in ancestor.items():
+            if uuid in removals[first].keys():
+                print ("Removed %sly: #%s (%s)"%(first,localId,uuid))
+            elif uuid in removals[second].keys():
+                print ("Removed %sly: #%s (%s)"%(second,localId,uuid))
+            else:
+                output[uuid] = localId
+                localIdsUsed[localId] = ""
+                lastLocalId = int(localId)
+        useNewIds = False
+        for uuid,localId in additions[first].items():
+            if uuid not in ancestor.keys() and \
+               uuid not in removals[first].keys() and \
+               uuid not in removals[second].keys() and \
+               uuid not in output.keys():
+                if not useNewIds and localId not in localIdsUsed.keys():
+                    #we can use this id
+                    output[uuid] = localId
+                    print("Added %sly: #%s (%s)"%(first,localId,uuid))
+                    localIdsUsed[localId] = ""
+                    lastLocalId = int(localId)
+                else:
+                    useNewIds = True
+                    #this localId has been used.  We need to set it to
+                    #the next number
+                    lastLocalId += 1
+                    print("Added %sly: #%d [changed from #s]  (%s)"%(first,
+                            lastLocalId,localId,uuid))
+                    output[uuid] = str(lastLocalId)
+        useNewIds = False
+        for uuid,localId in additions[second].items():
+            if uuid not in ancestor.keys() and \
+               uuid not in removals[first].keys() and \
+               uuid not in removals[second].keys() and \
+               uuid not in output.keys():
+                if not useNewIds and localId not in localIdsUsed.keys():
+                    #we can use this id
+                    output[uuid] = localId
+                    print("Added %sly: #%s (%s)"%(second,localId,uuid))
+                    localIdsUsed[localId] = ""
+                    lastLocalId = int(localId)
+                else:
+                    useNewIds = True
+                    #this localId has been used.  We need to set it to
+                    #the next number
+                    lastLocalId += 1
+                    print("Added %sly: #%d [changed from #%s] (%s)"%(second,
+                            lastLocalId,localId,uuid))
+                    output[uuid] = str(lastLocalId)
+        #print the results
+        outputStr = ""
+        for uuid,localId in output.items():
+            outputStr += "%s\t%s\n"%(localId,uuid)
+        #print(outputStr)
+            
 def Main():
     """
     Function called when this file is called from the command line
@@ -347,6 +490,19 @@ def Main():
             editParser.add_argument("--%s"%field.name,help = field.help)
     editParser.add_argument('help',help = commandHelpMessage,nargs='?')
     editParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
+
+    #---------------------------------------------
+    # pull command
+    #---------------------------------------------
+    pullParser = helpSubParsers.add_parser('pull',help = 'fetch and merge tickets from a remote repository.  By default, the remote numbering scheme is used, so local tickets added will be re-numbered')
+    pullParser.add_argument('--remoteBranch',
+                            help = 'name of the remote ticket branch')
+    pullParser.add_argument('--keep-local',
+                            action = 'store_true',
+                            default = False,
+                            help = 'keep the numbering scheme of the local tickets and apply the remote tickets on top')
+    pullParser.add_argument('help',help = commandHelpMessage,nargs='?')
+    pullParser.add_argument('remote',help = "name of the remote repository",nargs=1)
 
     #____________________________________________
     # Parse the command line
@@ -434,6 +590,14 @@ def Main():
             sys.exit(0)
         else:
             tkt.edit(parseResults.ticketId, not parseResults.non_interactive)
+    elif parseResults.subparser == 'pull':
+        if parseResults.help and 'help' in parseResults.help:
+            pullParser.print_help()
+            sys.exit(0)
+        else:
+            if not parseResults.remoteBranch:
+                parseResults.remoteBranch = parseResults.branch
+            tkt.pull(parseResults.remote[0],parseResults.remoteBranch,parseResults.keep_local)
 
 if __name__ == '__main__':
     #try:
