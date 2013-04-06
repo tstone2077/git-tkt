@@ -6,6 +6,7 @@
 #      description)
 #TODO: when giving multiple arguments to show, the first argument is ignored
 #      since it is part of the 'help' attribute instead of 'ticketIds'
+#TODO: Instead of using outputStr, pass in a stream that cna be written to
 
 import argparse
 from collections import OrderedDict
@@ -115,13 +116,16 @@ class GitTkt:
         if branch is not None:
             self.branch = branch
 
-    def new(self):
+    def new(self,nonInteractive = False ):
         """
         Create a new ticket.
         """
         data = {}
         for field in self.fields:
             if field.editable and field.value is None:
+                if nonInteractive:
+                    raise GitTktError("ERROR: No value for field set.  to set a"
+                                      "value, use --%s."%field.name)
                 inputStr = raw_input("%s [%s]: "%(field.title,field.default))
                 if len(inputStr) == 0:
                     data[field.name] = field.default
@@ -139,7 +143,7 @@ class GitTkt:
         self._SaveToShelf(ticketId,data,message)
         self._AddToNumMap(ticketId)
         self._UpdateDatabase(ticketId,data)
-        print("Added Ticket #%d (%s)"%(self.nextNum,ticketId))
+        return "Added Ticket #%d (%s)"%(self.nextNum,ticketId)
 
     def _GetTicketIds(self,num):
         localNum = None
@@ -206,36 +210,35 @@ class GitTkt:
         #loaded and queried if needed.
         pass
 
-    def _GetTicketData(self,ticketId,fieldNames = None):
+    def _GetTicketData(self,ticketId):
         local,uuid = self._GetTicketIds(ticketId)
         if uuid is None:
             raise GitTktError("Ticket not found: %s"%ticketId)
         shelfData = gitshelve.open(branch=self.branch)
         returnData = ticketData = eval(shelfData["active/%s"%uuid])
-        if fieldNames is not None:
-            returnData = {}
-            for name in fieldNames:
-                returnData[name] = ticketData[name]
         returnData['num'] = local
         returnData['uuid'] = uuid
         shelfData.close()
         return returnData
         
     def show(self,ticketIds):
+        outputStr = ""
         for ticketId in ticketIds:
             ticketData = self._GetTicketData(ticketId)
-            print("-"*30)
-            print("Ticket %d (%s)"%(ticketData['num'],ticketData['uuid']))
+            outputStr += "-"*30 + "\n"
+            outputStr += "Ticket %d (%s)\n"%(ticketData['num'],
+                                             ticketData['uuid'])
             for key,value in ticketData.items():
                 if key != 'num' and key != 'uuid':
-                    print("  %s = %s"%(key.upper(),value))
-            print("-"*30)
-            print
+                    outputStr += "  %s = %s\n"%(key.upper(),value)
+            outputStr += "-"*30 + "\n"
+        return outputStr
 
     def list(self):
         #TODO: support query parameters
         #TODO: use a screen formatting library
         self._LoadNumMap()
+        outputStr = ""
         tickets = [ line.split("\t") for line in self.numMap.strip().split("\n") ]
         
         #print the columns
@@ -245,7 +248,7 @@ class GitTkt:
             if colSize > 0:
                 colStr = field.title[:colSize].center(colSize) + "|"
                 colData.append(colStr)
-        print(''.join(colData))
+        outputStr += ''.join(colData) + "\n"
 
         #print the ticket data
         for ticket in tickets:
@@ -261,11 +264,15 @@ class GitTkt:
                             " ").ljust(colSize) + "|")
                     else:
                         rowData.append("".ljust(colSize) + "|")
-            print(''.join(rowData))
+            outputStr += ''.join(rowData) + "\n"
+        return outputStr
 
     def edit(self,ticketIds,interactive = True):
+        outputStr = ""
         for ticketId in ticketIds:
             ticketData = self._GetTicketData(ticketId)
+            localId = ticketData['num']
+            uuid = ticketData['uuid']
             for field in self.fields:
                 try:
                     currentValue = ticketData[field.name]
@@ -278,8 +285,10 @@ class GitTkt:
                             ticketData[field.name] = inputStr
                 else:
                     ticketData[field.name] = field.value
-            message = "Editing ticket %s"%ticketData['uuid']
-            self._SaveToShelf(ticketData['uuid'],ticketData,message)
+            message = "Editing ticket %s"%uuid
+            self._SaveToShelf(uuid,ticketData,message)
+            outputStr += "Successfully edited ticket #%s\n"%localId
+        return outputStr
 
     def pull(self,remote,remoteBranch,keepLocal = True):
         """
@@ -307,6 +316,7 @@ class GitTkt:
         a new local numbering scheme based on the numbering scheme the user
         wanted to keep.
         """
+        outputStr = ""
         gitshelve.git('fetch',remote,remoteBranch)
         #update numbering
         #attempt to read it from te shelf
@@ -338,7 +348,7 @@ class GitTkt:
             second = 'remote'
             firstChanges = localChanges
             secondChanges = remoteChanges
-        print("Applying %s changes after %s changes"%(second,first))
+        outputStr += "Applying %s changes after %s changes\n"%(second,first)
         #determine the changes that will be needed
         removals = {}
         removals['local'] = OrderedDict()
@@ -369,9 +379,9 @@ class GitTkt:
         lastLocalId = 0#int(max(maxValues))
         for uuid,localId in ancestor.items():
             if uuid in removals[first].keys():
-                print ("Removed %sly: #%s (%s)"%(first,localId,uuid))
+                outputStr += "Removed %sly: #%s (%s)\n"%(first,localId,uuid)
             elif uuid in removals[second].keys():
-                print ("Removed %sly: #%s (%s)"%(second,localId,uuid))
+                outputstr += "Removed %sly: #%s (%s)\n"%(second,localId,uuid)
             else:
                 output[uuid] = localId
                 localIdsUsed[localId] = ""
@@ -385,7 +395,7 @@ class GitTkt:
                 if not useNewIds and localId not in localIdsUsed.keys():
                     #we can use this id
                     output[uuid] = localId
-                    print("Added %sly: #%s (%s)"%(first,localId,uuid))
+                    outputStr += "Added %sly: #%s (%s)\n"%(first,localId,uuid)
                     localIdsUsed[localId] = ""
                     lastLocalId = int(localId)
                 else:
@@ -393,8 +403,8 @@ class GitTkt:
                     #this localId has been used.  We need to set it to
                     #the next number
                     lastLocalId += 1
-                    print("Added %sly: #%d [changed from #s]  (%s)"%(first,
-                            lastLocalId,localId,uuid))
+                    outputStr += "Added %sly: #%d [changed from #s] (%s)\n"%(
+                                    first, lastLocalId, localId, uuid)
                     output[uuid] = str(lastLocalId)
         useNewIds = False
         for uuid,localId in additions[second].items():
@@ -405,7 +415,7 @@ class GitTkt:
                 if not useNewIds and localId not in localIdsUsed.keys():
                     #we can use this id
                     output[uuid] = localId
-                    print("Added %sly: #%s (%s)"%(second,localId,uuid))
+                    outputStr += "Added %sly: #%s (%s)\n"%(second,localId,uuid)
                     localIdsUsed[localId] = ""
                     lastLocalId = int(localId)
                 else:
@@ -413,22 +423,18 @@ class GitTkt:
                     #this localId has been used.  We need to set it to
                     #the next number
                     lastLocalId += 1
-                    print("Added %sly: #%d [changed from #%s] (%s)"%(second,
-                            lastLocalId,localId,uuid))
+                    outputStr += "Added %sly: #%d [changed from #%s] (%s)\n"%(
+                                 second, lastLocalId, localId, uuid)
                     output[uuid] = str(lastLocalId)
-        #print the results
-        outputStr = ""
-        for uuid,localId in output.items():
-            outputStr += "%s\t%s\n"%(localId,uuid)
-        #print(outputStr)
+        return outputStr
             
-def Main():
+def Main(args):
     """
     Function called when this file is called from the command line
     """
     commandHelpMessage = 'show this help message and exit'
     fields = LoadFields()
-    versionStr = "%s %s"%(os.path.basename(sys.argv[0]),str(GIT_TKT_VERSION))
+    versionStr = "%s %s"%(os.path.basename(args[0]),str(GIT_TKT_VERSION))
     parser = argparse.ArgumentParser(description='Git ticket tracking system',
                                      version=versionStr)
     #---------------------------------------------
@@ -441,19 +447,23 @@ def Main():
     parser.add_argument('--branch',help='branch name to store tickets.  This'
                         ' branch never needs to be checked out.',
                         default = GIT_TKT_DEFAULT_BRANCH)
+    parser.add_argument("--non-interactive",
+                            help = "do not prompt for input if a value is not "
+                            "supplied on the command line",
+                            default = False, action = "store_true")
 
     #---------------------------------------------
     # help command
     #---------------------------------------------
-    helpSubParsers = parser.add_subparsers(dest="subparser",
+    subParsers = parser.add_subparsers(dest="subparser",
                                            title="Commands that can be run")
 
-    helpParser = helpSubParsers.add_parser('help',help = commandHelpMessage)
+    helpParser = subParsers.add_parser('help',help = commandHelpMessage)
 
     #---------------------------------------------
     # new command
     #---------------------------------------------
-    newParser = helpSubParsers.add_parser('new',help = 'create a new ticket.')
+    newParser = subParsers.add_parser('new',help = 'create a new ticket.')
     for field in fields:
         if not field.default or len(field.default) == 0:
             helpStr = "%s"%(field.help)
@@ -465,7 +475,7 @@ def Main():
     #---------------------------------------------
     # show command
     #---------------------------------------------
-    showParser = helpSubParsers.add_parser('show',help = 'show information of'
+    showParser = subParsers.add_parser('show',help = 'show information of'
                                            ' an existing ticket.')
     showParser.add_argument('help',help = commandHelpMessage,nargs='?')
     showParser.add_argument('ticketId',help = "id of the ticket",nargs='+')
@@ -473,18 +483,14 @@ def Main():
     #---------------------------------------------
     # list command
     #---------------------------------------------
-    listParser = helpSubParsers.add_parser('list',help = 'display a list of all'
+    listParser = subParsers.add_parser('list',help = 'display a list of all'
                                            ' the tickets')
     listParser.add_argument('help',help = commandHelpMessage,nargs='?')
 
     #---------------------------------------------
     # edit command
     #---------------------------------------------
-    editParser = helpSubParsers.add_parser('edit',help = 'edit a specific ticket')
-    editParser.add_argument("--non-interactive",
-                            help = "do not prompt for input if a value is not "
-                            "supplied on the command line",
-                            default = False, action = "store_true")
+    editParser = subParsers.add_parser('edit',help = 'edit a specific ticket')
     for field in fields:
         if field.editable:
             editParser.add_argument("--%s"%field.name,help = field.help)
@@ -494,7 +500,9 @@ def Main():
     #---------------------------------------------
     # pull command
     #---------------------------------------------
-    pullParser = helpSubParsers.add_parser('pull',help = 'fetch and merge tickets from a remote repository.  By default, the remote numbering scheme is used, so local tickets added will be re-numbered')
+    pullParser = subParsers.add_parser('pull',help = "fetch and merge tickets"
+        " from a remote repository.  By default, the remote numbering scheme is"
+        " used, so local tickets added will be re-numbered")
     pullParser.add_argument('--remoteBranch',
                             help = 'name of the remote ticket branch')
     pullParser.add_argument('--keep-local',
@@ -504,12 +512,12 @@ def Main():
     pullParser.add_argument('help',help = commandHelpMessage,nargs='?')
     pullParser.add_argument('remote',help = "name of the remote repository",nargs=1)
 
+    outputStr = ""
     #____________________________________________
     # Parse the command line
     #____________________________________________
-    parseResults = parser.parse_args(sys.argv[1:])
+    parseResults = parser.parse_args(args[1:])
 
-    print(parseResults)
     if parseResults.subparser != 'help':
         for field in fields:
             try:
@@ -548,13 +556,15 @@ def Main():
         for data in configurableData:
             value = getattr(parseResults,data)
             confData[data] = value
-            print("Storing config data: --%s '%s'"%(data,confData[data]))
+            outputStr += "Storing config data: --%s '%s'\n"%(data,
+                         confData[data])
             with open(gittktConf,'w') as file:
                 file.write(str(confData))
     for data in configurableData:
-        if "--%s"%data not in sys.argv:
+        if "--%s"%data not in args:
             try:
-                print("Using config data: --%s '%s'"%(data,confData[data]))
+                outputStr += "Using config data: --%s '%s'\n"%(data,
+                             confData[data])
                 setattr(parseResults,data,confData[data])
             except KeyError:
                 pass
@@ -565,42 +575,57 @@ def Main():
     tkt = GitTkt(fields,parseResults.branch)
     if parseResults.subparser == 'help':
         parser.print_help()
-        sys.exit(0)
+        return 0
     if parseResults.subparser == 'new':
         if parseResults.help and 'help' in parseResults.help:
             newParser.print_help()
-            sys.exit(0)
+            return 0
         else:
-            tkt.new()
+            return outputStr + tkt.new(parseResults.non_interactive)
     elif parseResults.subparser == 'show':
-        if parseResults.help and 'help' in parseResults.help:
+        #since there are multiple positional arguments, help may not
+        #be present.
+        if parseResults.help and 'help' in parseResults.help or \
+            'help' in parseResults.ticketId:
             showParser.print_help()
-            sys.exit(0)
+            return 0
         else:
-            tkt.show(parseResults.ticketId)
+            return outputStr + tkt.show(parseResults.ticketId)
     elif parseResults.subparser == 'list':
         if parseResults.help and 'help' in parseResults.help:
             listParser.print_help()
-            sys.exit(0)
+            return 0
         else:
-            tkt.list()
+            return outputStr + tkt.list()
     elif parseResults.subparser == 'edit':
-        if parseResults.help and 'help' in parseResults.help:
+        if parseResults.help and 'help' in parseResults.help or \
+            'help' in parseResults.ticketId:
             editParser.print_help()
-            sys.exit(0)
+            return 0
         else:
-            tkt.edit(parseResults.ticketId, not parseResults.non_interactive)
+            return outputStr + tkt.edit(parseResults.ticketId, 
+                            not parseResults.non_interactive)
     elif parseResults.subparser == 'pull':
-        if parseResults.help and 'help' in parseResults.help:
+        if parseResults.help and 'help' in parseResults.help or \
+            'help' in parseResults.remote:
             pullParser.print_help()
-            sys.exit(0)
+            return 0
         else:
             if not parseResults.remoteBranch:
                 parseResults.remoteBranch = parseResults.branch
-            tkt.pull(parseResults.remote[0],parseResults.remoteBranch,parseResults.keep_local)
+            return outputStr + tkt.pull(parseResults.remote[0],
+                            parseResults.remoteBranch,
+                            parseResults.keep_local)
 
 if __name__ == '__main__':
-    #try:
-        Main()
-    #except Exception as e:
-    #    print("ERROR: %s"%str(e))
+    try:
+        retval = Main(sys.argv)
+        if isinstance(retval,str) and len(retval) > 0:
+            print(retval)
+            sys.exit(0)
+        if isinstance(retval,int):
+            sys.exit(retval)
+        else:
+            raise GitTktError("Unknown return type from Main()")
+    except Exception as e:
+        print("ERROR: %s"%str(e))

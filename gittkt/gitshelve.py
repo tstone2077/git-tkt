@@ -32,6 +32,7 @@
 
 import re
 import os
+from pipes import quote
 
 try:
     from io import StringIO
@@ -57,20 +58,26 @@ verbose = False
 
 
 class GitError(Exception):
-    def __init__(self, cmd, args, kwargs, stderr=None):
+    def __init__(self, cmd, args, kwargs, stderr=None, returncode = 0):
+        Exception.__init__(self)
         self.cmd = cmd
         self.args = args
         self.kwargs = kwargs
         self.stderr = stderr
-        Exception.__init__(self)
+        self.returncode = returncode
+
+    def __str__(self):
+        return self.__unicode__()
 
     def __unicode__(self):
+        errorMsg = "Git command failed"
+        if self.returncode != 0:
+            errorMsg += "(%d)"%self.returncode
+        errorMsg += ": git %s %s"%(
+            self.cmd,' '.join(quote(s) for s in self.args))
         if self.stderr:
-            return "Git command failed: git %s %s: %s" % \
-                (self.cmd, self.args, self.stderr)
-        else:
-            return "Git command failed: git %s %s" % (self.cmd, self.args)
-
+            errorMsg += " %s"%(self.stderr)
+        return errorMsg
 
 def git(cmd, *args, **kwargs):
     restart = True
@@ -128,7 +135,7 @@ def git(cmd, *args, **kwargs):
                 if kwargs['restart'](cmd, args, kwargs):
                     restart = True
             elif not ignore_errors:
-                raise GitError(cmd, args, kwargs, err)
+                raise GitError(cmd, args, kwargs, err, returncode)
 
     if not 'ignore_output' in kwargs:
         if 'keep_newline' in kwargs:
