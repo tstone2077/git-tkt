@@ -58,14 +58,12 @@ class t_gittkt(unittest.TestCase):
         args = ['gittkt.py','--branch','test','--save','new']
         args.extend(self.GetFieldArgs())
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(
-            retval.find( "Storing config data: --branch 'test'"), 0)
+        self.assertRegexpMatches(retval, "Storing config data: --branch 'test'")
         args = ['gittkt.py','new']
         args.extend(self.GetFieldArgs())
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(
-            retval.find( "Using config data: --branch 'test'"), 0)
-        self.assertGreaterEqual(retval.find( "Added Ticket #2"),0)
+        self.assertRegexpMatches(retval,"Using config data: --branch 'test'")
+        self.assertRegexpMatches(retval,"Added Ticket #2")
 
         #Test saving when git was created with --separate-git-dir
         try:
@@ -78,8 +76,8 @@ class t_gittkt(unittest.TestCase):
             args = ['gittkt.py','--branch','test','--save','new']
             args.extend(self.GetFieldArgs())
             retval = gittkt.Main(args)
-            self.assertGreaterEqual(
-                retval.find( "Storing config data: --branch 'test'"), 0)
+            self.assertRegexpMatches(retval,
+                "Storing config data: --branch 'test'")
         finally:
             #cleanup
             os.chdir(lastCWD)
@@ -149,11 +147,11 @@ class t_gittkt(unittest.TestCase):
 
         args = ['gittkt.py','show',localId]
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(retval.find('NAME ='),0)
+        self.assertRegexpMatches(retval,'NAME = \w+')
 
         args = ['gittkt.py','show',uuid]
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(retval.find('NAME ='),0)
+        self.assertRegexpMatches(retval,'NAME =')
 
         args = ['gittkt.py','show','100']
         self.assertRaises(gittkt.GitTktError,gittkt.Main,args)
@@ -177,8 +175,8 @@ class t_gittkt(unittest.TestCase):
 
         args = ['gittkt.py','list']
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(retval.find('1  | data'),0)
-        self.assertGreaterEqual(retval.find('3  | data'),0)
+        self.assertRegexpMatches(retval,'1  | data')
+        self.assertRegexpMatches(retval,'3  | data')
 
     def testPull(self):
         #test help subcommand (need to hijack stderr
@@ -241,6 +239,22 @@ class t_gittkt(unittest.TestCase):
         #******END SETUP******
         args = ['gittkt.py','pull',remoteRepoDir]
         retval = gittkt.Main(args)
+        """
+        """
+        self.assertRegexpMatches(retval,'.*local changes after remote'
+            '.*\nAdded remotely: #4'
+            '.*\nAdded remotely: #5'
+            '.*\nAdded locally: #6 \[changed from #4\]'
+            )
+
+        args = ['gittkt.py','pull','--keep-local',remoteRepoDir]
+        retval = gittkt.Main(args)
+        self.assertRegexpMatches(retval,'.*remote changes after local'
+            '.*\nAdded locally: #4'
+            '.*\nAdded remotely: #5 \[changed from #4\]'
+            '.*\nAdded remotely: #6 \[changed from #5\]'
+            )
+
         #cleanup
         os.chdir(localRepoDir)
         shutil.rmtree(remoteRepoDir)
@@ -265,10 +279,10 @@ class t_gittkt(unittest.TestCase):
         args = ['gittkt.py','--non-interactive','edit',localId]
         args.extend(self.GetFieldArgs({'name':'edited'}))
         retval = gittkt.Main(args)
-        self.assertGreaterEqual(
-            retval.find( "Successfully edited ticket #1"), 0)
-        data = gitshelve.git('cat-file','-p','%s:%s'%(gittkt.GIT_TKT_DEFAULT_BRANCH, "active/%s"%uuid))
-        self.assertGreaterEqual(data.find("'name': 'edited'"),0)
+        self.assertRegexpMatches(retval,"Successfully edited ticket #1")
+        data = gitshelve.git('cat-file','-p',
+                '%s:%s'%(gittkt.GIT_TKT_DEFAULT_BRANCH, "active/%s"%uuid))
+        self.assertRegexpMatches(data,"'name': 'edited'")
 
         args = ['gittkt.py','--non-interactive','edit',uuid]
         retval = gittkt.Main(args)
