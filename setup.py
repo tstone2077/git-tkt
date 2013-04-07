@@ -16,7 +16,7 @@ setup(
         "Development Status :: 2 - Pre-Alpha",
         ],
     entry_points = {
-        'console_scripts': ['git-tkt = gittkt.gittkt:main']
+        'console_scripts': ['git-tkt = gittkt.gittkt:EntryPoint']
         },
     data_files = [
         ('git-tkt',['LICENSE','README'])

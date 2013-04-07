@@ -239,8 +239,11 @@ class GitTkt:
         #TODO: use a screen formatting library
         self._LoadNumMap()
         outputStr = ""
-        tickets = [ line.split("\t") for line in self.numMap.strip().split("\n") ]
-        
+        tickets = [line.split("\t") 
+                    for line in self.numMap.strip().split("\n") 
+                    if len(line)>0]
+        if len(tickets) == 0:
+            return "No Tickets Found"
         #print the columns
         colData = ["#  |"]
         for field in self.fields:
@@ -617,10 +620,12 @@ def Main(args):
                             parseResults.remoteBranch,
                             parseResults.keep_local)
 
-if __name__ == '__main__':
+def EntryPoint():
     try:
         retval = Main(sys.argv)
-        if isinstance(retval,str) and len(retval) > 0:
+        if isinstance(retval,str) or \
+           isinstance(retval,unicode) and \
+           len(retval) > 0:
             print(retval)
             sys.exit(0)
         if isinstance(retval,int):
@@ -629,3 +634,6 @@ if __name__ == '__main__':
             raise GitTktError("Unknown return type from Main()")
     except Exception as e:
         print("ERROR: %s"%str(e))
+
+if __name__ == '__main__':
+    EntryPoint()
