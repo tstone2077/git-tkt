@@ -7,12 +7,11 @@ import os.path
 import shutil
 import unittest
 import gitshelve
-import exceptions
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except:
-    from StringIO import StringIO
+    from io import StringIO
 
 class t_gitshelve(unittest.TestCase):
     def setUp(self):
@@ -36,7 +35,7 @@ class t_gitshelve(unittest.TestCase):
 
         def foo1(shelf):
             return shelf['foo/bar']
-        self.assertRaises(exceptions.KeyError, foo1, shelf)
+        self.assertRaises(KeyError, foo1, shelf)
 
         del shelf
 
@@ -48,14 +47,14 @@ class t_gitshelve(unittest.TestCase):
 
         def foo2(shelf):
             return shelf['foo/bar/baz.c']
-        self.assertRaises(exceptions.KeyError, foo2, shelf)
+        self.assertRaises(KeyError, foo2, shelf)
 
         shelf['foo/bar/baz.c'] = text
         del shelf['foo/bar']
 
         def foo4(shelf):
             return shelf['foo/bar/baz.c']
-        self.assertRaises(exceptions.KeyError, foo4, shelf)
+        self.assertRaises(KeyError, foo4, shelf)
 
         del shelf
 
@@ -90,7 +89,7 @@ class t_gitshelve(unittest.TestCase):
 
         commit = gitshelve.git('cat-file', 'commit', 'test',
                                keep_newline = True)
-        self.assert_(re.search('first\n$', commit))
+        self.assertTrue(re.search('first\n$', commit))
 
         data = gitshelve.git('cat-file', 'blob', 'test:foo/bar/baz.c',
                              keep_newline = True)
@@ -116,10 +115,14 @@ class t_gitshelve(unittest.TestCase):
         shelf['apple/orange/baz3.c'] = text
 
         buf = StringIO()
-        keys = shelf.keys()
+        keys = list(shelf.keys())
         keys.sort()
         for path in keys:
-            buf.write("path: (%s)\n" % path)
+            try:
+                buf.write("path: (%s)\n" % path)
+            except TypeError:
+                buf.write(unicode("path: (%s)\n" % path))
+
         self.assertEqual("""path: (alpha/beta/baz2.c)
 path: (apple/orange/baz3.c)
 path: (foo/bar/baz1.c)
@@ -170,7 +173,7 @@ path: (foo/bar/baz1.c)
 
         log = gitshelve.git('log', 'test', keep_newline = True)
 
-        self.assert_(re.match("""commit [0-9a-f]{40}
+        self.assertTrue(re.match("""commit [0-9a-f]{40}
 Author: .+
 Date:   .+
 
@@ -194,7 +197,7 @@ Date:   .+
             clonedfoo = os.path.join(repotestclone, 'foo.txt')
 
             try:
-                self.assert_(os.path.isfile(clonedfoo))
+                self.assertTrue(os.path.isfile(clonedfoo))
 
                 data = open(clonedfoo)
                 try:

@@ -32,14 +32,14 @@
 
 import re
 import os
+from pipes import quote
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except:
-    from StringIO import StringIO
+    from io import StringIO
 
 from subprocess import Popen, PIPE
-from string import split, join
 
 ######################################################################
 
@@ -58,20 +58,26 @@ verbose = False
 
 
 class GitError(Exception):
-    def __init__(self, cmd, args, kwargs, stderr=None):
+    def __init__(self, cmd, args, kwargs, stderr=None, returncode = 0):
+        Exception.__init__(self)
         self.cmd = cmd
         self.args = args
         self.kwargs = kwargs
         self.stderr = stderr
-        Exception.__init__(self)
+        self.returncode = returncode
+
+    def __str__(self):
+        return self.__unicode__()
 
     def __unicode__(self):
+        errorMsg = "Git command failed"
+        if self.returncode != 0:
+            errorMsg += "(%d)"%self.returncode
+        errorMsg += ": git %s %s"%(
+            self.cmd,' '.join(quote(s) for s in self.args))
         if self.stderr:
-            return u"Git command failed: git %s %s: %s" % \
-                (self.cmd, self.args, self.stderr)
-        else:
-            return u"Git command failed: git %s %s" % (self.cmd, self.args)
-
+            errorMsg += " %s"%(self.stderr)
+        return errorMsg
 
 def git(cmd, *args, **kwargs):
     restart = True
@@ -81,11 +87,11 @@ def git(cmd, *args, **kwargs):
             stdin_mode = PIPE
 
         if verbose:
-            print "Command: git %s %s" % (cmd, join(args, ' '))
+            print("Command: git %s %s" % (cmd, ' '.join(args)))
             if 'input' in kwargs:
-                print "Input: <<EOF"
-                print kwargs['input'],
-                print "EOF"
+                print("Input: <<EOF")
+                print(kwargs['input'])
+                print("EOF")
 
         environ = None
         if 'repository' in kwargs:
@@ -117,7 +123,7 @@ def git(cmd, *args, **kwargs):
         else:
             input = ''
 
-        if isinstance(input, unicode):
+        if isinstance(input, str):
             input = input.encode("utf-8")
         out, err = proc.communicate(input)
 
@@ -129,13 +135,17 @@ def git(cmd, *args, **kwargs):
                 if kwargs['restart'](cmd, args, kwargs):
                     restart = True
             elif not ignore_errors:
-                raise GitError(cmd, args, kwargs, err)
+                raise GitError(cmd, args, kwargs, err, returncode)
 
     if not 'ignore_output' in kwargs:
         if 'keep_newline' in kwargs:
-            return unicode(out, "utf-8")
+            retval = out
         else:
-            return unicode(out[:-1], "utf-8")
+            retval = out[:-1]
+    try:
+        return str(retval,"utf-8")
+    except TypeError:
+        return unicode(retval)
 
 
 class gitbook:
@@ -215,7 +225,7 @@ class gitshelve(dict):
     def git(self, *args, **kwargs):
         if self.repository:
             kwargs['repository'] = self.repository
-        return apply(git, args, kwargs)
+        return git(*args, **kwargs)
 
     def current_head(self):
         x = self.git('rev-parse', self.branch)
@@ -241,8 +251,7 @@ class gitshelve(dict):
         if not self.head:
             return
 
-        ls_tree = split(self.git('ls-tree', '-r', '-t', '-z', self.head),
-                        '\0')
+        ls_tree = self.git('ls-tree', '--full-tree','-r', '-t', '-z', self.head).split('\0')
         for line in ls_tree:
             if not line:
                 continue
@@ -254,7 +263,7 @@ class gitshelve(dict):
             name = match.group(4)
             path = match.group(5)
 
-            parts = split(path, os.sep)
+            parts = path.split(os.sep)
             d = self.objects
             for part in parts:
                 if not part in d:
@@ -300,14 +309,14 @@ class gitshelve(dict):
         if '__root__' in objects:
             root = objects['__root__']
 
-        for path in objects.keys():
+        for path in list(objects.keys()):
             if path == '__root__':
                 continue
 
             obj = objects[path]
             assert isinstance(obj, dict)
 
-            if len(obj.keys()) == 1 and '__book__' in obj:
+            if len(list(obj.keys())) == 1 and '__book__' in obj:
                 book = obj['__book__']
                 if book.dirty:
                     if comment_accumulator:
@@ -389,7 +398,7 @@ class gitshelve(dict):
             fd.write('%stree %s\n' % (" " * indent, objects['__root__']))
             indent += 2
 
-        keys = objects.keys()
+        keys = list(objects.keys())
         keys.sort()
         for key in keys:
             if key == '__root__':
@@ -408,13 +417,16 @@ class gitshelve(dict):
                 else:
                     kind = 'tree'
 
-            fd.write('%s%s: %s\n' % (" " * indent, kind, key))
+            try:
+                fd.write('%s%s: %s\n' % (" " * indent, kind, key))
+            except TypeError:
+                fd.write(unicode('%s%s: %s\n' % (" " * indent, kind, key)))
 
             if kind[:4] == 'tree':
                 self.dump_objects(fd, indent + 2, objects[key])
 
     def get_tree(self, path, make_dirs=False):
-        parts = split(path, os.sep)
+        parts = path.split(os.sep)
         d = self.objects
         for part in parts:
             if make_dirs and not (part in d):
@@ -487,26 +499,26 @@ class gitshelve(dict):
 
     def __delitem__(self, path):
         try:
-            self.prune_tree(self.objects, split(path, os.sep))
+            self.prune_tree(self.objects, path.split(os.sep))
         except KeyError:
             raise KeyError(path)
 
     def __contains__(self, path):
         d = self.get_tree(path)
-        return len(d.keys()) == 1 and ('__book__' in d)
+        return len(list(d.keys())) == 1 and ('__book__' in d)
 
     def walker(self, kind, objects, path=''):
-        for item in objects.items():
+        for item in list(objects.items()):
             if item[0] == '__root__':
                 continue
             assert isinstance(item[1], dict)
 
             if path:
-                key = join((path, item[0]), os.sep)
+                key = os.sep.join((path, item[0]))
             else:
                 key = item[0]
 
-            if len(item[1].keys()) == 1 and ('__book__' in item[1]):
+            if len(list(item[1].keys())) == 1 and ('__book__' in item[1]):
                 value = item[1]['__book__']
                 if kind == 'keys':
                     yield key
@@ -526,6 +538,12 @@ class gitshelve(dict):
 
     def iteritems(self):
         return self.walker('items', self.objects)
+
+    def items(self):
+        i = []
+        for items in self.iteritems():
+            i.append(items)
+        return i
 
     def keys(self):
         k = []
