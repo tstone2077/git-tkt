@@ -17,7 +17,7 @@ class t_gittkt(unittest.TestCase):
 
     def testParseArgs(self):
         args = ['name','--verbose','debug']
-        results = gittkt.ParseArgs(args)
+        results,parser = gittkt.ParseArgs(args)
         self.assertRegexpMatches('debug',results.verbose)
 
     def testMain(self):
