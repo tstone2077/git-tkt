@@ -10,7 +10,8 @@
     library.
 """
 import argparse
-from gittkt import GitTkt,GITTKT_VERSION,GITTKT_DEFAULT_BRANCH
+from gittkt import GitTkt,GITTKT_VERSION,GITTKT_DEFAULT_BRANCH, \
+                   GITTKT_DEFAULT_SHELF
 from gittktShell import GitTktShell
 import logging
 import os
@@ -50,26 +51,35 @@ def ParseArgs(args):
     #---------------------------------------------
     outputParser = parser.add_argument_group("output options")
     outputParser.add_argument("--show-traceback", 
-                        action = 'store_true',
-                        help="show a traceback message instead of exiting"
+                            action = 'store_true',
+                            help="show a traceback message instead of exiting"
                               " gracefully")
     outputParser.add_argument("--verbose", const = "INFO", default = "ERROR",
-                        nargs = "?",
-                        help="level of verbose output to log"
-                        "(DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL)")
+                            nargs = "?",
+                            help="level of verbose output to log"
+                            "(DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL)")
 
     globalParser = parser.add_argument_group("global options")
-    globalParser.add_argument('--save',help='save the current global options'
-                              ' for future commands in the current repository',
-                        action = 'store_true',
-                        default = False)
-    globalParser.add_argument('--branch',help='branch name to store tickets.'
-                              '  This branch never needs to be checked out.',
-                        default = GITTKT_DEFAULT_BRANCH)
+    globalParser.add_argument('--branch',help='branch name to store tickets'
+                            '(NOTE: This branch never needs to be checked out)',
+                            default = GITTKT_DEFAULT_BRANCH)
     globalParser.add_argument("--non-interactive",
                             help = "prevent a prompt for input when a value is"
                                    " not supplied on the command line",
                             default = False, action = "store_true")
+    globalParser.add_argument('--save',help='save the current global options'
+                            ' for future commands in the current repository',
+                            action = 'store_true',
+                            default = False)
+    globalParser.add_argument('--shelves',
+                            help='comma separated list of shelf names to be'
+                            ' loaded (use --list-shelves for a listing of names',
+                            default = [GITTKT_DEFAULT_SHELF])
+    globalParser.add_argument('--list-shelves',
+                            help='display a list of shelves that are currently'
+                            ' available and exit',
+                            action = 'store_true',
+                            default = False)
     #---------------------------------------------
     # help command
     #---------------------------------------------
@@ -104,20 +114,24 @@ def Main(args):
         gittkt = GitTkt(branch = parseResults.pop('branch'),
                         non_interactive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
+                        listShelves = parseResults.pop('list_shelves'),
+                        loadShelves = parseResults.pop('shelves'),
                         )
         command = parseResults.pop('subcommand')
         #printHelpFunc = getattr(parser
         helpFunctions = parseResults.pop('helpFunctions')
-        return int(gittkt.run(command,helpFunctions[command],parseResults))
+        return int(gittkt.run(command,helpFunctions[command],**parseResults))
 
-def EntryPoint():
+def EntryPoint(exit=True):
     """ Function used in setuptools to execute the main CLI """
     showTraceback = False
     if '--show-traceback' in sys.argv:
         showTraceback = True
         del sys.argv[sys.argv.index('--show-traceback')]
     try:
-        sys.exit(Main(sys.argv))
+        retval = Main(sys.argv)
+        if exit:
+            sys.exit(retval)
     except Exception as e:
         if showTraceback:
             raise

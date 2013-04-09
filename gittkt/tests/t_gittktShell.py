@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import gittkt
+import gittktShell
 import os
 import sys
 import unittest
@@ -12,23 +13,6 @@ class t_gittkt(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def testGitTkt(self):
-        pass
-
-    def testParseArgs(self):
-        args = ['name','--verbose','debug']
-        results,parser = gittkt.ParseArgs(args)
-        self.assertRegexpMatches('debug',results.verbose)
-
-    def testMain(self):
-        with NoStdStreams():
-            self.assertEqual(gittkt.Main(['unittest','--verbose','debug']),0)
-
-    def testEntryPoint(self):
-        #not sure how to test this, since it runs sys.exit
-        pass
-        #gittkt.EntryPoint()
-        
 class NoStdStreams(object):
     def __init__(self):
         self.devnull = open(os.devnull,'w')
@@ -46,6 +30,16 @@ class NoStdStreams(object):
         sys.stderr = self.old_stderr
         self.devnull.close()
 
+class InputInjection(object):
+    def __init__(self):
+        self.raw_input = gittktShell.raw_input
+        gittktShell.raw_input = lambda *_: self.data
+        self.data = ""
 
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        gittktShell.raw_input = self.raw_input
 if __name__ == '__main__':
     unittest.main()

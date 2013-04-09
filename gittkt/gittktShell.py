@@ -10,7 +10,9 @@ try:
 except NameError:
     import builtins
     builtins.raw_input = builtins.input
-        
+#This is here so we can override raw input during the unit testing
+raw_input = raw_input        
+
 class GitTktShell:
     branch = None
     outstream = None
@@ -22,8 +24,10 @@ class GitTktShell:
         'exit':'exit the git-tkt shell',
     }
 
-    def __init__(self,branch,outstream=sys.stdout):
+    def __init__(self,branch,outstream=None):
         self.branch = branch
+        if outstream is None:
+            outstream = sys.stdout
         self.outstream = outstream
         self.outstream.write("Using branch %s\n"%self.branch)
         self.outstream.write("type 'commands' for a list of commands\n")
