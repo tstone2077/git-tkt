@@ -71,15 +71,11 @@ def ParseArgs(args):
                             ' for future commands in the current repository',
                             action = 'store_true',
                             default = False)
-    globalParser.add_argument('--shelves',
+    globalParser.add_argument('--load-shelves',
                             help='comma separated list of shelf names to be'
-                            ' loaded (use --list-shelves for a listing of names',
+                            ' loaded (use the "shelves" command for a listing'
+                            ' of names)',
                             default = [GITTKT_DEFAULT_SHELF])
-    globalParser.add_argument('--list-shelves',
-                            help='display a list of shelves that are currently'
-                            ' available and exit',
-                            action = 'store_true',
-                            default = False)
     #---------------------------------------------
     # help command
     #---------------------------------------------
@@ -88,6 +84,13 @@ def ParseArgs(args):
 
     helpFunctions['help'] = parser.print_help
     helpParser = subParsers.add_parser('help',help = commandHelpMessage)
+
+    #---------------------------------------------
+    # shelves command
+    #---------------------------------------------
+    listShelvesParser = subParsers.add_parser('shelves',
+                                             help = commandHelpMessage)
+    helpFunctions['shelves'] = listShelvesParser.print_help
 
     parseResults = parser.parse_args(args[1:])
     parseResults.helpFunctions = helpFunctions
@@ -114,8 +117,7 @@ def Main(args):
         gittkt = GitTkt(branch = parseResults.pop('branch'),
                         non_interactive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
-                        listShelves = parseResults.pop('list_shelves'),
-                        loadShelves = parseResults.pop('shelves'),
+                        loadShelves = parseResults.pop('load_shelves'),
                         )
         command = parseResults.pop('subcommand')
         #printHelpFunc = getattr(parser
