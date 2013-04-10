@@ -71,9 +71,9 @@ def ParseArgs(args):
                             ' for future commands in the current repository',
                             action = 'store_true',
                             default = False)
-    globalParser.add_argument('--load-shelves',
-                            help='comma separated list of shelf names to be'
-                            ' loaded (use the "shelves" command for a listing'
+    globalParser.add_argument('--load-archives',
+                            help='comma separated list of archive names to be'
+                            ' loaded (use the "archives" command for a listing'
                             ' of names)',
                             default = [GITTKT_DEFAULT_SHELF])
     #---------------------------------------------
@@ -86,11 +86,11 @@ def ParseArgs(args):
     helpParser = subParsers.add_parser('help',help = commandHelpMessage)
 
     #---------------------------------------------
-    # shelves command
+    # archives command
     #---------------------------------------------
-    listShelvesParser = subParsers.add_parser('shelves',
+    listArchivesParser = subParsers.add_parser('archives',
                                              help = commandHelpMessage)
-    helpFunctions['shelves'] = listShelvesParser.print_help
+    helpFunctions['archives'] = listArchivesParser.print_help
 
     parseResults = parser.parse_args(args[1:])
     parseResults.helpFunctions = helpFunctions
@@ -117,7 +117,7 @@ def Main(args):
         gittkt = GitTkt(branch = parseResults.pop('branch'),
                         non_interactive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
-                        loadShelves = parseResults.pop('load_shelves'),
+                        loadShelves = parseResults.pop('load_archives'),
                         )
         command = parseResults.pop('subcommand')
         #printHelpFunc = getattr(parser

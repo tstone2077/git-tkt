@@ -31,10 +31,10 @@ class t_gittkt(unittest.TestCase):
         shutil.rmtree(self.gitDir)
         self.stream.close()
 
-    def testShelves(self):
-        #test with no shelf
-        self.gittkt.shelves(None,None)
-        self.assertRegexpMatches(self.stream.getvalue(),"No shelves found.")
+    def testArchives(self):
+        #test with no archive
+        self.gittkt.archives()
+        self.assertRegexpMatches(self.stream.getvalue(),"No archives found.")
 
         #test with some shelves
         shelf = gitshelve.open(self.branch)
@@ -43,7 +43,7 @@ class t_gittkt(unittest.TestCase):
         shelf.commit()
 
         self.stream.truncate(0)
-        self.gittkt.shelves()
+        self.gittkt.archives()
         self.assertRegexpMatches(self.stream.getvalue(),"active\narchived\n")
         
 if __name__ == '__main__':

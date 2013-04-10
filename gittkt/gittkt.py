@@ -16,7 +16,10 @@ LS_TREE_RE = re.compile('((\d{6}) (tree|blob)) ([0-9a-f]{40})\t(start|(.+))$')
 class GitTktError(Exception):pass
 
 class GitTkt:
-    def __init__(self,branch,non_interactive,save,loadShelves,
+    """ 
+    A GitTkt object acts as an interface to a git-tkt system.
+    """
+    def __init__(self,branch,non_interactive,save,loadShelves,fieldsFile = None,
                  outstream = None):
         if outstream is None:
             outstream = sys.stdout
@@ -26,7 +29,9 @@ class GitTkt:
         self.save = save
         self.loadShelves = loadShelves
 
-    def shelves(self,*args,**kwargs):
+    def archives(self,*args,**kwargs):
+        """
+        """
         try:
             data = gitshelve.git('ls-tree','--full-tree',self.branch)
             for line in data.split("\n"):
@@ -35,7 +40,7 @@ class GitTkt:
                     self.outstream.write("%s\n"%matchObj.group(5))
             return 0
         except gitshelve.GitError as e:
-            self.outstream.write("No shelves found.\n")
+            self.outstream.write("No archives found.\n")
             return 1
 
     def run(self,command,printHelpFunc,*args,**kwargs):
