@@ -24,4 +24,5 @@ for t in testModules:
         suite.addTest(unittest.defaultTestLoader.loadTestsFromName(t))
 
 if __name__ == '__main__':
+    print("Python %s"%sys.version)
     unittest.TextTestRunner().run(suite)
