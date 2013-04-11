@@ -1,0 +1,11 @@
+<Fields>
+    <Field>
+        <title>Author</title>
+        <help>The author of the ticket</help>
+        <default>
+            <call function="GetGitUser" />
+        </default>
+        <editable>false</editable>
+        <listColSize>11</listColSize>
+    </Field>
+</Fields>

@@ -1,14 +1,21 @@
 # -*- coding: utf-8 -*-
 
+import base64
+from collections import OrderedDict
 import gittkt
 import gitshelve
+import json
 import os
 import shutil
 import sys
 import tempfile
 import unittest
-from StringIO import StringIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 class t_gittkt(unittest.TestCase):
     def setUp(self):
         """Create a new git repository, cd to it, and create the initial 
@@ -31,9 +38,39 @@ class t_gittkt(unittest.TestCase):
         shutil.rmtree(self.gitDir)
         self.stream.close()
 
+    def testRun(self):
+        command = 'archives'
+        def printHelpFunc():
+            pass
+        self.gittkt.Run(command,printHelpFunc)
+        self.assertRaises(gittkt.GitTktError,
+                          self.gittkt.Run,command,printHelpFunc,'fail')
+
+    def testLoadFields(self):
+        self.gittkt.LoadFields()
+        #assert the default fields are loaded
+        self.assertIn('name',self.gittkt.fields)
+        self.assertIn('description',self.gittkt.fields)
+        self.assertIn('author',self.gittkt.fields)
+
+        #save the default fields as a file:
+        #reset the fields
+        self.gittkt.fields = OrderedDict()
+
+        with self.assertRaises(gittkt.GitTktError):
+            self.gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+                                   'TestFieldsFile_err.xml'))
+
+        self.gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+                                   'TestFieldsFile.xml'))
+        #assert the expected fields are loaded
+        self.assertIn('author',self.gittkt.fields)
+        self.assertGreater(len(self.gittkt.fields['author'].default),0)
+        self.gittkt.fields['author'].SetValue('Thurston')
+
     def testArchives(self):
         #test with no archive
-        self.gittkt.archives()
+        self.gittkt.Archives()
         self.assertRegexpMatches(self.stream.getvalue(),"No archives found.")
 
         #test with some shelves
@@ -43,7 +80,7 @@ class t_gittkt(unittest.TestCase):
         shelf.commit()
 
         self.stream.truncate(0)
-        self.gittkt.archives()
+        self.gittkt.Archives()
         self.assertRegexpMatches(self.stream.getvalue(),"active\narchived\n")
         
 if __name__ == '__main__':

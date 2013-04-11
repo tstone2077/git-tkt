@@ -106,7 +106,7 @@ def Main(args):
     #make sure the return value of GitTkt is an int (return code)
     if parseResults.subcommand is None:
         shell = GitTktShell(parseResults.branch)
-        shell.run(ParseArgs)
+        shell.Run(ParseArgs)
         return 0
     else:
         parseResults = vars(parseResults)
@@ -122,7 +122,7 @@ def Main(args):
         command = parseResults.pop('subcommand')
         #printHelpFunc = getattr(parser
         helpFunctions = parseResults.pop('helpFunctions')
-        return int(gittkt.run(command,helpFunctions[command],**parseResults))
+        return int(gittkt.Run(command,helpFunctions[command],**parseResults))
 
 def EntryPoint(exit=True):
     """ Function used in setuptools to execute the main CLI """

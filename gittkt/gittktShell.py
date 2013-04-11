@@ -32,33 +32,34 @@ class GitTktShell:
         self.outstream.write("Using branch %s\n"%self.branch)
         self.outstream.write("type 'commands' for a list of commands\n")
 
-    def help(self,args):
+    def Help(self,args):
         self.outstream.write(str(args))
         self.outstream.write("\n")
 
-    def commands(self,args):
+    def Commands(self,args):
         self.outstream.write(str(args))
         self.outstream.write("\n")
 
-    def exit(self,args):
+    def Exit(self,args):
         self.outstream.write(self.EXIT_STR)
         self.outstream.write("\n")
 
-    def run(self,parseFunc):
+    def Run(self,parseFunc):
         input = ""
         while input != 'exit':
-            input = self.prompt()
+            input = self.Prompt()
             try:
-                args = shlex.split("git-tkt "+input)
-                if args[1] in self.shellCommands.keys():
-                    func = getattr(self,args[1])
-                    func(args)
+                args = shlex.split(input)
+                if args[0] in self.shellCommands.keys():
+                    commandFunc = args[0][0].upper() + args[0][1:]
+                    func = getattr(self,commandFunc)
+                    func(args[1:])
                 else:
                     parsedArgs = parseFunc(shlex.split("git-tkt "+input))
             except Exception as e:
                 self.outstream.write(str(e))
                 self.outstream.write("\n")
 
-    def prompt(self):
+    def Prompt(self):
         self.outstream.write(self.PROMPT)
         return raw_input()
