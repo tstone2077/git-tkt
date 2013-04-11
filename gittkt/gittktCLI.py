@@ -10,8 +10,7 @@
     library.
 """
 import argparse
-from gittkt import GitTkt,GITTKT_VERSION,GITTKT_DEFAULT_BRANCH, \
-                   GITTKT_DEFAULT_SHELF
+import gittkt
 from gittktShell import GitTktShell
 import logging
 import os
@@ -23,27 +22,41 @@ class GitTktArgParser(argparse.ArgumentParser):
     argument parser that throws exceptions instead of prints to stderr.
     Also subcommands are optional.
     """
+    def __init__(self,ignoreErrors = False,*args,**kwargs):
+        self.ignoreErrors = ignoreErrors
+        return argparse.ArgumentParser.__init__(self,*args,**kwargs)
+
     def parse_known_args(self,args=None,namespace=None):
         if args is None:
             args = sys.argv[1:]
         self.args = args
         return argparse.ArgumentParser.parse_known_args(self,args,namespace)
+
     def error(self,message):
         for action in self._actions:
             if action.dest == 'subcommand' and \
                 self._get_value(action,None) == None and \
                 message == 'too few arguments':
                 return argparse.Namespace()
+        if self.ignoreErrors:
+            return argparse.Namespace()
         raise ArgParseError(message)
         
 def ParseArgs(args):
     """ Setup the argument parser and parse the given arguments """
     commandHelpMessage = 'show this help message and exit'
-    #fields = LoadFields()
+    #Create a temporary arg parser to get the fields.  These fields are used
+    #in the actual argument parser
+    tempParser = GitTktArgParser(ignoreErrors = True,add_help = False)
+    tempParser.add_argument('--load-fields-file', default = None)
+    tempParser.add_argument('extra', nargs="*")
+    results = tempParser.parse_args(args[1:])
+    fields = gittkt.LoadFields(results.load_fields_file)
     #dictionary of command to help function of the command.  This is to support
     #help sub-subcommands
     helpFunctions = {}
-    versionStr = "%s %s"%(os.path.basename(args[0]),str(GITTKT_VERSION))
+    versionStr = "%s %s"%(os.path.basename(args[0]),
+                          str(gittkt.GITTKT_VERSION))
     parser = GitTktArgParser(description='git ticket tracking system',
                                      version=versionStr)
     #---------------------------------------------
@@ -62,7 +75,7 @@ def ParseArgs(args):
     globalParser = parser.add_argument_group("global options")
     globalParser.add_argument('--branch',help='branch name to store tickets'
                             '(NOTE: This branch never needs to be checked out)',
-                            default = GITTKT_DEFAULT_BRANCH)
+                            default = gittkt.GITTKT_DEFAULT_BRANCH)
     globalParser.add_argument("--non-interactive",
                             help = "prevent a prompt for input when a value is"
                                    " not supplied on the command line",
@@ -71,11 +84,14 @@ def ParseArgs(args):
                             ' for future commands in the current repository',
                             action = 'store_true',
                             default = False)
+    globalParser.add_argument('--load-fields-file',
+                            help='load xml file containing the field data',
+                            default = None)
     globalParser.add_argument('--load-archives',
                             help='comma separated list of archive names to be'
                             ' loaded (use the "archives" command for a listing'
                             ' of names)',
-                            default = [GITTKT_DEFAULT_SHELF])
+                            default = [gittkt.GITTKT_DEFAULT_SHELF])
     #---------------------------------------------
     # help command
     #---------------------------------------------
@@ -94,11 +110,11 @@ def ParseArgs(args):
 
     parseResults = parser.parse_args(args[1:])
     parseResults.helpFunctions = helpFunctions
-    return(parseResults)
+    return parseResults,fields
 
 def Main(args):
     """ Function called to parse and execute the command line """
-    parseResults = ParseArgs(args)
+    parseResults,fields = ParseArgs(args)
     level=getattr(logging,parseResults.verbose.upper())
     format='%(asctime)s:[%(filename)s(%(lineno)d)]:[%(levelname)s]: %(message)s'
     logging.basicConfig(level=level,format=format)
@@ -114,15 +130,16 @@ def Main(args):
         #to pop them off.
         parseResults.pop('verbose')
         parseResults.pop('show_traceback')
-        gittkt = GitTkt(branch = parseResults.pop('branch'),
+        gitTkt = gittkt.GitTkt(branch = parseResults.pop('branch'),
                         non_interactive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
                         loadShelves = parseResults.pop('load_archives'),
+                        fields = fields
                         )
         command = parseResults.pop('subcommand')
         #printHelpFunc = getattr(parser
         helpFunctions = parseResults.pop('helpFunctions')
-        return int(gittkt.Run(command,helpFunctions[command],**parseResults))
+        return int(gitTkt.Run(command,helpFunctions[command],**parseResults))
 
 def EntryPoint(exit=True):
     """ Function used in setuptools to execute the main CLI """

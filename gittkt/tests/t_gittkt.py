@@ -47,26 +47,22 @@ class t_gittkt(unittest.TestCase):
                           self.gittkt.Run,command,printHelpFunc,'fail')
 
     def testLoadFields(self):
-        self.gittkt.LoadFields()
+        fields = gittkt.LoadFields()
         #assert the default fields are loaded
-        self.assertIn('name',self.gittkt.fields)
-        self.assertIn('description',self.gittkt.fields)
-        self.assertIn('author',self.gittkt.fields)
+        self.assertIn('name',fields)
+        self.assertIn('description',fields)
+        self.assertIn('author',fields)
 
-        #save the default fields as a file:
-        #reset the fields
-        self.gittkt.fields = OrderedDict()
-
-        with self.assertRaises(gittkt.GitTktError):
-            self.gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+        with self.assertRaises(gittkt.GitTktError): 
+            gittkt.LoadFields(os.path.join(SCRIPT_DIR,
                                    'TestFieldsFile_err.xml'))
 
-        self.gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+        fields = gittkt.LoadFields(os.path.join(SCRIPT_DIR,
                                    'TestFieldsFile.xml'))
         #assert the expected fields are loaded
-        self.assertIn('author',self.gittkt.fields)
-        self.assertGreater(len(self.gittkt.fields['author'].default),0)
-        self.gittkt.fields['author'].SetValue('Thurston')
+        self.assertIn('author',fields)
+        self.assertGreater(len(fields['author'].default),0)
+        fields['author'].SetValue('Thurston')
 
     def testArchives(self):
         #test with no archive

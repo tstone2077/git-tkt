@@ -55,14 +55,84 @@ class TicketField:
     def SetValue(self,value):
         self.value = value
 
+def GetGitUser():
+    return "%s <%s>"%(
+        gitshelve.git("config","user.name"),
+        gitshelve.git("config","user.email"),
+    )
+
+def LoadFields(fieldsFile = None):
+    """
+    Load the fields that can be stored in a ticket.
+    NOTE: the order in which this fields are loaded is the order that they
+    are presented in the list and show commands as well as the editable
+    display
+
+    Example of fields file:
+    <Fields>
+        <Field>
+            <name>author</name>
+            <title>Author</title>
+            <help>The author of the ticket</help>
+            <default>
+                <!-- function is a part of GitTkt class -->
+                <call function="GetGitUser" />
+            </default>
+            <editable>false</editable>
+            <listColSize>11</listColSize>
+        </Field>
+    </Fields>
+    """
+    fields = OrderedDict()
+    if fieldsFile is not None:
+        #open and parse the fields file
+        root = ElementTree.parse(fieldsFile).getroot()
+        for child in root:
+            if child.tag.lower() == 'field':
+                attribs = {}
+                #parse the field tag
+                for attrib in child:
+                    attribs[attrib.tag] = attrib.text
+                    call = attrib.find('.//call')
+                    if call is not None:
+                        thisModule = sys.modules[__name__]
+                        func = getattr(thisModule,call.attrib['function'])
+                        attribs[attrib.tag] = func()
+                if 'name' not in attribs.keys():
+                    raise GitTktError("'name' not found in field list"
+                                      " from %s"%fieldsFile)
+                fields[attribs['name']] = TicketField(**attribs)
+    else:
+        #load the default fields
+        fields['name'] = TicketField(name = "name",
+                    title = "Ticket Name",
+                    help = "The name of the ticket",
+                    default = "My Ticket",
+                    listColSize = 33,
+                    )
+        fields['description'] = TicketField(name = "description",
+                    title = "Description",
+                    help = "Description of the ticket",
+                    default = "",
+                    )
+        fields['author'] = TicketField(name = "author",
+                    title = "Author",
+                    help = "The author of the ticket",
+                    default = GetGitUser(),
+                    editable = False,
+                    listColSize = 11,
+                    )
+    return fields
 class GitTkt:
     """ 
     A GitTkt object acts as an interface to a git-tkt system.
     """
-    def __init__(self,branch,non_interactive,save,loadShelves,fieldsFile = None,
+    def __init__(self,branch,non_interactive,save,loadShelves,fields = None,
                  outstream = None):
-        self.fields = OrderedDict()
-        self.LoadFields(fieldsFile)
+        if fields is None:
+            self.fields = LoadFields()
+        else:
+            fields = fields
         if outstream is None:
             outstream = sys.stdout
         self.outstream = outstream
@@ -95,68 +165,4 @@ class GitTkt:
         function = getattr(self,command)
         return function(args,kwargs)
 
-    def GetGitUser(self):
-        return "%s <%s>"%(
-            gitshelve.git("config","user.name"),
-            gitshelve.git("config","user.email"),
-        )
 
-    def LoadFields(self,fieldsFile = None):
-        """
-        Load the fields that can be stored in a ticket.
-        NOTE: the order in which this fields are loaded is the order that they
-        are presented in the list and show commands as well as the editable
-        display
-
-        Example of fields file:
-        <Fields>
-            <Field>
-                <name>author</name>
-                <title>Author</title>
-                <help>The author of the ticket</help>
-                <default>
-                    <!-- function is a part of GitTkt class -->
-                    <call function="GetGitUser" />
-                </default>
-                <editable>false</editable>
-                <listColSize>11</listColSize>
-            </Field>
-        </Fields>
-        """
-        if fieldsFile is not None:
-            #open and parse the fields file
-            root = ElementTree.parse(fieldsFile).getroot()
-            for child in root:
-                if child.tag.lower() == 'field':
-                    attribs = {}
-                    #parse the field tag
-                    for attrib in child:
-                        attribs[attrib.tag] = attrib.text
-                        call = attrib.find('.//call')
-                        if call is not None:
-                            func = getattr(self,call.attrib['function'])
-                            attribs[attrib.tag] = func()
-                    if 'name' not in attribs.keys():
-                        raise GitTktError("'name' not found in field list"
-                                          " from %s"%fieldsFile)
-                    self.fields[attribs['name']] = TicketField(**attribs)
-        else:
-            #load the default fields
-            self.fields['name'] = TicketField(name = "name",
-                        title = "Ticket Name",
-                        help = "The name of the ticket",
-                        default = "My Ticket",
-                        listColSize = 33,
-                        )
-            self.fields['description'] = TicketField(name = "description",
-                        title = "Description",
-                        help = "Description of the ticket",
-                        default = "",
-                        )
-            self.fields['author'] = TicketField(name = "author",
-                        title = "Author",
-                        help = "The author of the ticket",
-                        default = self.GetGitUser(),
-                        editable = False,
-                        listColSize = 11,
-                        )

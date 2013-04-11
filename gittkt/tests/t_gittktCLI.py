@@ -6,6 +6,7 @@ import os
 import sys
 import unittest
 
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 class t_gittkt(unittest.TestCase):
     def setUp(self):
         pass
@@ -17,9 +18,12 @@ class t_gittkt(unittest.TestCase):
         pass
 
     def testParseArgs(self):
-        args = ['name','--verbose','debug']
-        results = gittktCLI.ParseArgs(args)
+        args = ['name', '--verbose','debug', '--load-fields-file',
+                os.path.join(SCRIPT_DIR,'TestFieldsFile.xml')]
+        results,fields = gittktCLI.ParseArgs(args)
         self.assertRegexpMatches('debug',results.verbose)
+        self.assertIn('author',fields.keys())
+        self.assertNotIn('description',fields.keys())
 
     def testMain(self):
         with NoStdStreams():
