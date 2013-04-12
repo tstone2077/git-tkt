@@ -6,12 +6,22 @@ import os
 import os.path
 import shutil
 import unittest
+
+dirName = os.path.dirname(__file__)
+parentDir = (os.path.abspath(os.path.join(dirName,"..")))
+if parentDir not in sys.path:
+    sys.path.insert(0,parentDir)
 import gitshelve
 
 try:
     from io import StringIO
 except:
     from io import StringIO
+
+dirName = os.path.dirname(__file__)
+parentDir = (os.path.abspath(os.path.join(dirName,"..")))
+if parentDir not in sys.path:
+    sys.path.insert(0,parentDir)
 
 class t_gitshelve(unittest.TestCase):
     def setUp(self):

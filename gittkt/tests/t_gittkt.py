@@ -2,8 +2,6 @@
 
 import base64
 from collections import OrderedDict
-import gittkt
-import gitshelve
 import json
 import os
 import shutil
@@ -15,7 +13,15 @@ try:
 except ImportError:
     from io import StringIO
 
+dirName = os.path.dirname(__file__)
+parentDir = (os.path.abspath(os.path.join(dirName,"..")))
+if parentDir not in sys.path:
+    sys.path.insert(0,parentDir)
+import gittkt
+import gitshelve
+
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
+
 class t_gittkt(unittest.TestCase):
     def setUp(self):
         """Create a new git repository, cd to it, and create the initial 

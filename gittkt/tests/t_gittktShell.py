@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 
-import gittkt
-import gittktShell
 import os
 import sys
 import unittest
 
-class t_gittkt(unittest.TestCase):
+dirName = os.path.dirname(__file__)
+parentDir = (os.path.abspath(os.path.join(dirName,"..")))
+if parentDir not in sys.path:
+    sys.path.insert(0,parentDir)
+
+import gittkt
+import gittktShell
+
+class t_gittktShell(unittest.TestCase):
     def setUp(self):
         pass
 

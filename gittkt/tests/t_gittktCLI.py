@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 
-import gittktCLI
-from t_gittktShell import NoStdStreams,InputInjection
 import os
 import sys
 import unittest
+from t_gittktShell import NoStdStreams,InputInjection
+
+dirName = os.path.dirname(__file__)
+parentDir = (os.path.abspath(os.path.join(dirName,"..")))
+if parentDir not in sys.path:
+    sys.path.insert(0,parentDir)
+import gittktCLI
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-class t_gittkt(unittest.TestCase):
+
+class t_gittktCLI(unittest.TestCase):
     def setUp(self):
         pass
 
