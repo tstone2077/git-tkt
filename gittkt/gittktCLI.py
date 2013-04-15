@@ -87,9 +87,9 @@ def ParseArgs(args):
     globalParser.add_argument('--load-fields-file',
                             help='load xml file containing the field data',
                             default = None)
-    globalParser.add_argument('--load-archives',
-                            help='comma separated list of archive names to be'
-                            ' loaded (use the "archives" command for a listing'
+    globalParser.add_argument('--load-folders',
+                            help='comma separated list of folder names to be'
+                            ' loaded (use the "folder" command for a listing'
                             ' of names)',
                             default = [gittkt.GITTKT_DEFAULT_SHELF])
     #---------------------------------------------
@@ -102,11 +102,11 @@ def ParseArgs(args):
     helpParser = subParsers.add_parser('help',help = commandHelpMessage)
 
     #---------------------------------------------
-    # archives command
+    # folders command
     #---------------------------------------------
-    listArchivesParser = subParsers.add_parser('archives',
+    listFoldersParser = subParsers.add_parser('folders',
                                              help = commandHelpMessage)
-    helpFunctions['archives'] = listArchivesParser.print_help
+    helpFunctions['folders'] = listFoldersParser.print_help
 
     parseResults = parser.parse_args(args[1:])
     parseResults.helpFunctions = helpFunctions
@@ -133,7 +133,7 @@ def Main(args):
         gitTkt = gittkt.GitTkt(branch = parseResults.pop('branch'),
                         non_interactive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
-                        loadShelves = parseResults.pop('load_archives'),
+                        loadShelves = parseResults.pop('load_folders'),
                         fields = fields
                         )
         command = parseResults.pop('subcommand')

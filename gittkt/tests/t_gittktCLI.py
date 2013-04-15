@@ -20,9 +20,6 @@ class t_gittktCLI(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def testGitTkt(self):
-        pass
-
     def testParseArgs(self):
         args = ['name', '--verbose','debug', '--load-fields-file',
                 os.path.join(SCRIPT_DIR,'TestFieldsFile.xml')]

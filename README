@@ -19,7 +19,7 @@ Development:
         global options:
             --branch branchname          use this branch as the shelf
             --non-interactive            do not prompt the user
-            --load-shelves shelf[,shelf] load tickets from the given shelves
+            --load-folders folder[,folder] load tickets from the given shelves
             --fields-file                load this file which contains the field
                                          information
             --save                       save given global options as default
@@ -80,22 +80,23 @@ Development:
                     --remote-branch the remote ticket branch to pull from
 
             archive ticketId [ticketId ...]
-                Move given tickets to the 'archived' shelf
+                Move given tickets to the 'archived' folder
 
-            move newShelf
-                Move tickets from one shelf to another.
+            move ticketId newFolder
+                Move tickets to a specific Folder.
 
 
     Classes:
-       TicketShelf:
-            Represents a shelf that contains tickets.  The only mandatory shelf
-            is the 'active' shelf.  Other shelves can be used as the user wants.
-            For example, they can make an 'archive' shelf for all the closed
+       TicketFolder:
+            Represents a folder that contains tickets.  The only mandatory
+            folder is the 'active' folder.  Other shelves can be used as the
+            user wants.
+            For example, they can make an 'archive' folder for all the closed
             tickets, so they do not clutter the active listing.  Or they can
-            make an 'version-1.0', 'version-2.0', and 'version-3.0' shelf.
+            make an 'version-1.0', 'version-2.0', and 'version-3.0' folder.
 
             Properities:
-                name:        a unique name for this shelf.  This translates to a
+                name:        a unique name for this folder. This translates to a
                              directory on the git branch.
                 dbCacheFile: file storing the sqlite database of tickets.
                 index.txt:   a text file containing a mapping of a local index 
@@ -105,15 +106,15 @@ Development:
                              system.
             Methods:
                 Add(ticketData):
-                    Adds a ticket to this shelf.  This includes updating the
+                    Adds a ticket to this folder.  This includes updating the
                     branch with the correct data, updating the index.txt file,
                     and updating the database cache.
                 Remove(ticketData):
-                    Removes a ticket from this shelf.  This includes updating
+                    Removes a ticket from this folder.  This includes updating
                     the branch with the correct data, updating the index.txt
                     file, and updating the database cache.
                 Update(ticketData):
-                    Updates a ticket from this shelf.  This includes updating
+                    Updates a ticket from this folder.  This includes updating
                     the branch with the correct data, and updating the database 
                     cache.
                 UpdateFieldData(fieldData):
@@ -172,8 +173,8 @@ Development:
 
 Future:
     TODO: Document how field data is translated into database inserts/queries
-    TODO: Need a clean way to set the fields file for a given shelf
+    TODO: Need a clean way to set the fields file for a given folder
     TODO: If fields are added or removed, how do we update existing data?
     TODO: Add subcommand for admin tasks such as:
             list dbcache info (file name, size)
-            remove a shelf (dangerous... maybe)
+            remove a folder (dangerous... maybe)

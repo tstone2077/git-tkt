@@ -45,7 +45,7 @@ class t_gittkt(unittest.TestCase):
         self.stream.close()
 
     def testRun(self):
-        command = 'archives'
+        command = 'folders'
         def printHelpFunc():
             pass
         self.gittkt.Run(command,printHelpFunc)
@@ -70,10 +70,10 @@ class t_gittkt(unittest.TestCase):
         self.assertGreater(len(fields['author'].default),0)
         fields['author'].SetValue('Thurston')
 
-    def testArchives(self):
-        #test with no archive
-        self.gittkt.Archives()
-        self.assertRegexpMatches(self.stream.getvalue(),"No archives found.")
+    def testFolders(self):
+        #test with no folders
+        self.gittkt.Folders()
+        self.assertRegexpMatches(self.stream.getvalue(),"No folders found.")
 
         #test with some shelves
         shelf = gitshelve.open(self.branch)
@@ -82,7 +82,7 @@ class t_gittkt(unittest.TestCase):
         shelf.commit()
 
         self.stream.truncate(0)
-        self.gittkt.Archives()
+        self.gittkt.Folders()
         self.assertRegexpMatches(self.stream.getvalue(),"active\narchived\n")
         
 if __name__ == '__main__':

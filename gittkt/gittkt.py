@@ -141,7 +141,7 @@ class GitTkt:
         self.save = save
         self.loadShelves = loadShelves
 
-    def Archives(self,*args,**kwargs):
+    def Folders(self,*args,**kwargs):
         try:
             data = gitshelve.git('ls-tree','--full-tree',self.branch)
             for line in data.split("\n"):
@@ -150,7 +150,7 @@ class GitTkt:
                     self.outstream.write("%s\n"%matchObj.group(5))
             return 0
         except gitshelve.GitError as e:
-            self.outstream.write("No archives found.\n")
+            self.outstream.write("No folders found.\n")
             return 1
 
     def Run(self,command,printHelpFunc,*args,**kwargs):
