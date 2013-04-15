@@ -9,24 +9,30 @@
 # Note: This script will run on any platform that supports bash/uname.  This 
 # includes platforms using msysgit (using Git Bash).
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [ $1 == '--help' ]; then
+    echo "Usage: $0 [python_binary_path] [environment_name]"
+fi
+
 PYTHON_BIN=$1
 if [ -z "$PYTHON_BIN" ];then
    PYTHON_BIN=$(which python)
 fi
 
-ENV_NAME=$2
-if [ -z "$ENV_NAME" ];then
-   OS=$(uname -s)
-   ARCH=$(uname --machine)
-   ENV_NAME=$OS.$ARCH
-fi
 
 #hack, if windows, append exe to python bin
 if [ ! -z $(echo $OS | grep -i "mingw") ]; then
     PYTHON_BIN=$PYTHON_BIN.exe
 fi
+PYTHON_VERSION=$($PYTHON_BIN --version 2>&1| sed -e 's/Python //')
+
+ENV_NAME=$2
+if [ -z "$ENV_NAME" ];then
+   OS=$(uname -s)
+   ARCH=$(uname --machine)
+   ENV_NAME=py$PYTHON_VERSION-$ARCH-$OS
+fi
 echo Creating environment "$ENV_NAME" using $PYTHON_BIN ...
-python $SCRIPT_DIR/virtualenv.py -p "$PYTHON_BIN" "$ENV_NAME" || exit $?
+python $SCRIPT_DIR/virtualenv.py -p "$PYTHON_BIN" $SCRIPT_DIR/"$ENV_NAME" || exit $?
 
 if [ ! -z $(echo $OS | grep -i "mingw") ]; then
     INTERMEDIATE_DIR=Scripts
@@ -34,7 +40,7 @@ else
     INTERMEDIATE_DIR=bin
 fi
 
-. "$ENV_NAME/$INTERMEDIATE_DIR/activate"
+. "$SCRIPT_DIR/$ENV_NAME/$INTERMEDIATE_DIR/activate"
 
 #install packages
 export PIP_DOWNLOAD_CACHE=$SCRIPT_DIR/pip-cache
