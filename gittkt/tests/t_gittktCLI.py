@@ -3,7 +3,8 @@
 import os
 import sys
 import unittest
-from t_GitTktShell import NoStdStreams,InputInjection
+from t_GitTktShell import InputInjection
+from t_gitshelve import NoStdStreams
 
 dirName = os.path.dirname(__file__)
 parentDir = (os.path.abspath(os.path.join(dirName,"..")))

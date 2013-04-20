@@ -35,7 +35,7 @@ import os
 from pipes import quote
 
 try:
-    from io import StringIO
+    from StringIO import StringIO
 except:
     from io import StringIO
 

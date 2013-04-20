@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import re
 import os
-import os.path
+import re
 import shutil
+import sys
+import tempfile
 import unittest
 
-dirName = os.path.dirname(__file__)
-parentDir = (os.path.abspath(os.path.join(dirName,"..")))
-if parentDir not in sys.path:
-    sys.path.insert(0,parentDir)
-import gitshelve
-
 try:
-    from io import StringIO
+    from StringIO import StringIO
 except:
     from io import StringIO
 
@@ -22,20 +16,156 @@ dirName = os.path.dirname(__file__)
 parentDir = (os.path.abspath(os.path.join(dirName,"..")))
 if parentDir not in sys.path:
     sys.path.insert(0,parentDir)
+import gitshelve
+
+SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class t_gitshelve(unittest.TestCase):
     def setUp(self):
-        if os.name == 'nt':
-            self.tmpdir = os.getenv('TEMP')
-        else:
-            self.tmpdir = '/tmp'
-        try: gitshelve.git('branch', '-D', 'test')
-        except: pass
+        """Create a new git repository, cd to it, and create the initial 
+           commit"""
+        self.gitDir = tempfile.mkdtemp()
+        self.lastCWD = os.getcwd()
+        os.chdir(self.gitDir)
+        stream = os.popen('git init')
+        self.assertIn("Initialized empty Git repository in",stream.read())
+        stream.close()
+        #add a file to our repository
+        with open(os.path.join(self.gitDir,'file'),'w') as f:
+            f.write('temp')
+        stream = os.popen('git add file')
+        out = stream.read()
+        stream.close()
+        self.assertEqual('',out)
+        stream = os.popen('git commit -m temp')
+        out = stream.read()
+        stream.close()
+        self.assertIn('1 file changed, 1 insertion',out)
+
+        self.stream = StringIO()
+        self.gitConfigFile = os.path.join(os.environ['HOME'],'.gitconfig')
+        #REVISIT:  This sucks! In order to force git init to fail, I have to 
+        #change the user's ~/.gitconfig file.  That means if the unit tests
+        #are aborted mid way through, the configuration can be lost.  There
+        #needs to be a better way to make git init fail.
+        with open(self.gitConfigFile) as f:
+            self.gitConfig = f.read()
 
     def tearDown(self):
-        try: gitshelve.git('branch', '-D', 'test')
-        except: pass
+        """Delete the git repository"""
+        os.chdir(self.lastCWD)
+        shutil.rmtree(self.gitDir)
+        self.stream.close()
+        #make sure the user's git config file is the way it was before we found
+        #it
+        with open(self.gitConfigFile,'w') as f:
+            f.write(self.gitConfig)
 
+    def testGitError(self):
+        cmd = 'branch'
+        args = ['-D','test']
+        kwargs = {}
+        stderr = None
+        returncode = 1
+        e = gitshelve.GitError(cmd,args,kwargs,stderr,returncode)
+        self.assertEqual(str(e),"Git command failed(1): git branch -D test")
+
+        cmd = 'branch'
+        args = ['-D','test']
+        kwargs = {}
+        stderr = "No branch for you"
+        returncode = 1
+        e = gitshelve.GitError(cmd,args,kwargs,stderr,returncode)
+        self.assertEqual(str(e),"Git command failed(1): git branch -D test No"
+                                " branch for you")
+    def testGit(self):
+        #run with verbose turned on
+        gitshelve.verbose = True
+        with NoStdStreams():
+            self.assertEqual(gitshelve.git('branch','-a'),"* master")
+            tree = gitshelve.git('write-tree')
+
+        #test with input in kwargs
+        stdIn = 'first commit'
+        result = ""
+        with NoStdStreams():
+            result = gitshelve.git('commit-tree',tree,input = stdIn)
+
+        self.assertRegexpMatches(result,'[0-9a-f]{40}')
+
+        #from now on, run with verbose turned off
+        gitshelve.verbose = False
+
+        #test with repository in kwargs
+        #-----repo exists
+        rootRepoName = tempfile.mkdtemp()
+        with self.assertRaises(gitshelve.GitError):
+            gitshelve.git('ls-tree',repository = rootRepoName)
+        #-----repo does not exist
+        #----------first, cause git init to fail
+        repoName = os.path.join(rootRepoName,"nonExistentRepo")
+        with open(self.gitConfigFile,'w') as f:
+            f.write("[push]\n\tdefault = trash")
+        with self.assertRaises(gitshelve.GitError):
+            gitshelve.git('write-tree',repository = repoName)
+        shutil.rmtree(repoName)
+        #----------fix config so git init won't fail
+        with open(self.gitConfigFile,'w') as f:
+            f.write(self.gitConfig)
+        tree = gitshelve.git('write-tree',repository = repoName)
+        self.assertRegexpMatches(tree,'[0-9a-f]{40}')
+        cwdTree = gitshelve.git('ls-tree',tree)
+        self.assertEqual('',cwdTree)
+        shutil.rmtree(rootRepoName)
+
+        #test with worktree in kwargs
+        #-----repo exists
+        rootRepoName = tempfile.mkdtemp()
+        out = gitshelve.git('checkout','master', worktree = rootRepoName)
+        self.assertEqual('D\tfile',out)
+        #-----repo does not exist
+
+        repoName = os.path.join(rootRepoName,'nonExistentRepo')
+        out = gitshelve.git('checkout','master', worktree = repoName, keep_newline = True)
+        self.assertEqual('D\tfile\n',out)
+        shutil.rmtree(rootRepoName)
+
+    def testGitbook(self):
+        lsTreeRE = re.compile('(\d{6}) (tree|blob) ([0-9a-f]{40})\t(start|(.+))$')
+        tree = gitshelve.git('ls-tree','--full-tree','-r', '-t','master')
+        name = lsTreeRE.match(tree).group(3)
+        shelf = gitshelve.gitshelve()
+        b = gitshelve.gitbook(shelf, self.gitDir, name=name)
+        self.assertEqual(repr(b),
+                         '<gitshelve.gitbook %s %s False>'%(self.gitDir,name))
+        data = 'temp'
+        self.assertEqual(data,b.get_data())
+        b.set_data(data)
+        self.assertEqual(data,b.get_data())
+        self.assertEqual(data,b.serialize_data(data))
+        self.assertEqual(data,b.deserialize_data(data))
+        newData = 'text'
+        self.assertEqual(None,b.set_data(newData))
+        self.assertEqual(None,b.change_comment())
+        b.__setstate__({'data': 'something'})
+        self.assertEqual(b.__getstate__(),{'shelf': {}, 'path': self.gitDir,
+                                           'data': 'something', 'name': None})
+    #----gitshelve tests-------
+    def testInit(self):
+        s = gitshelve.gitshelve()
+        s.close()
+
+    """
+    def testGit(self):
+        s = gitshelve.gitshelve() This line makes the coverage drop from 41 to 35%
+        out = s.git('ls-tree','--full-tree','-r','-t','master')
+        self.assertEqual('100644 blob 3602361dafeea2cbec159128f5166a8428c0795c'
+                         '\tfile',out)
+        out = s.git('ls-tree','--full-tree','-r','-t','master',
+                    repository=self.gitDir)
+        self.fail(out)
+    #"""
+class OldTests:
     def testBasicInsertion(self):
         shelf = gitshelve.open('test')
         text = "Hello, this is a test\n"
@@ -193,8 +323,8 @@ Date:   .+
 """, log))
 
     def testDetachedRepo(self):
-        repotest = os.path.join(self.tmpdir, 'repo-test')
-        repotestclone = os.path.join(self.tmpdir, 'repo-test-clone')
+        repotest = os.path.join(self.gitDir, 'repo-test')
+        repotestclone = os.path.join(self.gitDir, 'repo-test-clone')
         shelf = gitshelve.open(repository = repotest)
         text = "Hello, world!\n"
         shelf['foo.txt'] = text
@@ -223,9 +353,10 @@ Date:   .+
                 shutil.rmtree(repotest)
 
     def testBlobStore(self):
+        blobpath = None
         """Test use a gitshelve as a generic blob store."""
         try:
-            blobpath = os.path.join(self.tmpdir, 'blobs')
+            blobpath = os.path.join(self.gitDir, 'blobs')
             shelf = gitshelve.open(repository = blobpath, keep_history = False)
             text = "This is just some sample text.\n"
             hash = shelf.put(text)
@@ -257,11 +388,26 @@ Date:   .+
             self.assertEqual(text, shelf.get(hash))
             del shelf
         finally:
-            if os.path.isdir(blobpath):
+            if blobpath and os.path.isdir(blobpath):
                 shutil.rmtree(blobpath)
 
-def suite():
-    return unittest.TestLoader().loadTestsFromTestCase(t_gitshelve)
+
+class NoStdStreams(object):
+    def __init__(self,stdout = None, stderr = None):
+        self.devnull = open(os.devnull,'w')
+        self._stdout = stdout or self.devnull or sys.stdout
+        self._stderr = stderr or self.devnull or sys.stderr
+
+    def __enter__(self):
+        self.old_stdout, self.old_stderr = sys.stdout, sys.stderr
+        self.old_stdout.flush(); self.old_stderr.flush()
+        sys.stdout, sys.stderr = self._stdout, self._stderr
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._stdout.flush(); self._stderr.flush()
+        sys.stdout = self.old_stdout
+        sys.stderr = self.old_stderr
+        self.devnull.close()
 
 if __name__ == '__main__':
     unittest.main()
