@@ -19,7 +19,7 @@ Development:
         global options:
             --branch branchname          use this branch as the shelf
             --non-interactive            do not prompt the user
-            --load-folders folder[,folder] load tickets from the given shelves
+            --load-folders folder[,folder] load tickets from the given folders
             --fields-file                load this file which contains the field
                                          information
             --save                       save given global options as default
@@ -89,7 +89,7 @@ Development:
     Classes:
        TicketFolder:
             Represents a folder that contains tickets.  The only mandatory
-            folder is the 'active' folder.  Other shelves can be used as the
+            folder is the 'active' folder.  Other folders can be used as the
             user wants.
             For example, they can make an 'archive' folder for all the closed
             tickets, so they do not clutter the active listing.  Or they can
@@ -98,7 +98,6 @@ Development:
             Properities:
                 name:        a unique name for this folder. This translates to a
                              directory on the git branch.
-                dbCacheFile: file storing the sqlite database of tickets.
                 index.txt:   a text file containing a mapping of a local index 
                              number to the universally unique id of the ticket.
                              This allows easy referencing to a ticket, yet lets
@@ -117,8 +116,6 @@ Development:
                     Updates a ticket from this folder.  This includes updating
                     the branch with the correct data, and updating the database 
                     cache.
-                UpdateFieldData(fieldData):
-                    Update the data in the fileds.cfg file.
                 Merge():
                     TODO: Update merge function with necessary parameters once
                     they are known.
@@ -156,7 +153,7 @@ Development:
               being used.  This is an area that may need optimizing in the
               future.
         If a cache databased file does not exist, one is created by reading the
-        data for the given shelves from the ticket branch.  THE TICKET BRANCH 
+        data for the given folders from the ticket branch.  THE TICKET BRANCH 
         IS ALWAYS UPDATED FIRST.  If ever the branch was updated, but the cached
         database file was not (maybe due to a crash), the database file can be
         re-read.

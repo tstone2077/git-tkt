@@ -4,21 +4,19 @@
 #construction of the version information
 GITTKT_VERSION="0.1.0"
 GITTKT_DEFAULT_BRANCH='git-tkt'
-GITTKT_DEFAULT_SHELF='active'
-GITTKT_NUM_MAP_FILE='index.txt'
-MIN_UUID_LENGTH=30
 
 from collections import OrderedDict
 import gitshelve
 import pickle
 import re
 import sys
+from GitTktCache import GitTktCache
 from xml.etree import ElementTree
 
 LS_TREE_RE = re.compile('((\d{6}) (tree|blob)) ([0-9a-f]{40})\t(start|(.+))$')
 class GitTktError(Exception):pass
 
-class TicketField:
+class TicketField(object):
     """
     A field that can be stored in the ticket.
     """
@@ -123,23 +121,51 @@ def LoadFields(fieldsFile = None):
                     listColSize = 11,
                     )
     return fields
-class GitTkt:
+
+class GitTkt(object):
     """ 
     A GitTkt object acts as an interface to a git-tkt system.
     """
-    def __init__(self,branch,non_interactive,save,loadShelves,fields = None,
+    outstream = None
+    branch = GITTKT_DEFAULT_BRANCH
+    nonInteractive = True
+    save = False
+    def __init__(self,branch,nonInteractive,save,loadFolders,fields = None,
                  outstream = None):
         if fields is None:
             self.fields = LoadFields()
         else:
-            fields = fields
+            self.fields = fields
         if outstream is None:
             outstream = sys.stdout
         self.outstream = outstream
         self.branch = branch
-        self.non_interactive = non_interactive
+        self.nonInteractive = nonInteractive
         self.save = save
-        self.loadShelves = loadShelves
+        self.cache = GitTktCache(loadFolders,self.fields,self.branch,outstream)
+
+    def New(self,*args,**kwargs):
+        """
+        Create a new ticket.
+        """
+        data = {}
+        for field in self.fields:
+            if field.editable and field.value is None:
+                if self.nonInteractive:
+                    raise GitTktError("ERROR: No value for field set.  to set a"
+                                      "value, use --%s."%field.name)
+                inputStr = raw_input("%s [%s]: "%(field.title,field.default))
+                if len(inputStr) == 0:
+                    data[field.name] = field.default
+                else:
+                    data[field.name] = inputStr
+            else:
+                data[field.name] = field.value
+        data['creation_date'] = str(datetime.datetime.now())
+        folder = None
+        if 'to_folder' in kwargs:
+            folder = kwargs['to_folder']
+        ticketId = self.cache.Add(data,folder)
 
     def Folders(self,*args,**kwargs):
         try:

@@ -17,12 +17,12 @@ dirName = os.path.dirname(__file__)
 parentDir = (os.path.abspath(os.path.join(dirName,"..")))
 if parentDir not in sys.path:
     sys.path.insert(0,parentDir)
-import gittkt
+import GitTkt
 import gitshelve
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
-class t_gittkt(unittest.TestCase):
+class t_GitTkt(unittest.TestCase):
     def setUp(self):
         """Create a new git repository, cd to it, and create the initial 
            commit"""
@@ -32,10 +32,10 @@ class t_gittkt(unittest.TestCase):
         gitshelve.git('init')
         self.stream = StringIO()
         self.branch = 'git-tkt'
-        self.gittkt = gittkt.GitTkt(branch = self.branch,
-                             non_interactive = True,
+        self.gittkt = GitTkt.GitTkt(branch = self.branch,
+                             nonInteractive = True,
                              save = False,
-                             loadShelves = ['active'],
+                             loadFolders = ['active'],
                              outstream = self.stream)
 
     def tearDown(self):
@@ -49,21 +49,21 @@ class t_gittkt(unittest.TestCase):
         def printHelpFunc():
             pass
         self.gittkt.Run(command,printHelpFunc)
-        self.assertRaises(gittkt.GitTktError,
+        self.assertRaises(GitTkt.GitTktError,
                           self.gittkt.Run,command,printHelpFunc,'fail')
 
     def testLoadFields(self):
-        fields = gittkt.LoadFields()
+        fields = GitTkt.LoadFields()
         #assert the default fields are loaded
         self.assertIn('name',fields)
         self.assertIn('description',fields)
         self.assertIn('author',fields)
 
-        with self.assertRaises(gittkt.GitTktError): 
-            gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+        with self.assertRaises(GitTkt.GitTktError): 
+            GitTkt.LoadFields(os.path.join(SCRIPT_DIR,
                                    'TestFieldsFile_err.xml'))
 
-        fields = gittkt.LoadFields(os.path.join(SCRIPT_DIR,
+        fields = GitTkt.LoadFields(os.path.join(SCRIPT_DIR,
                                    'TestFieldsFile.xml'))
         #assert the expected fields are loaded
         self.assertIn('author',fields)

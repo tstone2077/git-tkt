@@ -9,10 +9,10 @@ parentDir = (os.path.abspath(os.path.join(dirName,"..")))
 if parentDir not in sys.path:
     sys.path.insert(0,parentDir)
 
-import gittkt
-import gittktShell
+import GitTkt
+import GitTktShell
 
-class t_gittktShell(unittest.TestCase):
+class t_GitTktShell(unittest.TestCase):
     def setUp(self):
         pass
 
@@ -38,14 +38,14 @@ class NoStdStreams(object):
 
 class InputInjection(object):
     def __init__(self):
-        self.raw_input = gittktShell.raw_input
-        gittktShell.raw_input = lambda *_: self.data
+        self.raw_input = GitTktShell.raw_input
+        GitTktShell.raw_input = lambda *_: self.data
         self.data = ""
 
     def __enter__(self):
         pass
 
     def __exit__(self, exc_type, exc_value, traceback):
-        gittktShell.raw_input = self.raw_input
+        GitTktShell.raw_input = self.raw_input
 if __name__ == '__main__':
     unittest.main()

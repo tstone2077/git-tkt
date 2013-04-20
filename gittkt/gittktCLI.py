@@ -10,8 +10,8 @@
     library.
 """
 import argparse
-import gittkt
-from gittktShell import GitTktShell
+import GitTkt
+from GitTktShell import GitTktShell
 import logging
 import os
 import sys
@@ -51,12 +51,12 @@ def ParseArgs(args):
     tempParser.add_argument('--load-fields-file', default = None)
     tempParser.add_argument('extra', nargs="*")
     results = tempParser.parse_args(args[1:])
-    fields = gittkt.LoadFields(results.load_fields_file)
+    fields = GitTkt.LoadFields(results.load_fields_file)
     #dictionary of command to help function of the command.  This is to support
     #help sub-subcommands
     helpFunctions = {}
     versionStr = "%s %s"%(os.path.basename(args[0]),
-                          str(gittkt.GITTKT_VERSION))
+                          str(GitTkt.GITTKT_VERSION))
     parser = GitTktArgParser(description='git ticket tracking system',
                                      version=versionStr)
     #---------------------------------------------
@@ -75,7 +75,7 @@ def ParseArgs(args):
     globalParser = parser.add_argument_group("global options")
     globalParser.add_argument('--branch',help='branch name to store tickets'
                             '(NOTE: This branch never needs to be checked out)',
-                            default = gittkt.GITTKT_DEFAULT_BRANCH)
+                            default = GitTkt.GITTKT_DEFAULT_BRANCH)
     globalParser.add_argument("--non-interactive",
                             help = "prevent a prompt for input when a value is"
                                    " not supplied on the command line",
@@ -91,7 +91,7 @@ def ParseArgs(args):
                             help='comma separated list of folder names to be'
                             ' loaded (use the "folder" command for a listing'
                             ' of names)',
-                            default = [gittkt.GITTKT_DEFAULT_SHELF])
+                            default = None)
     #---------------------------------------------
     # help command
     #---------------------------------------------
@@ -107,6 +107,21 @@ def ParseArgs(args):
     listFoldersParser = subParsers.add_parser('folders',
                                              help = commandHelpMessage)
     helpFunctions['folders'] = listFoldersParser.print_help
+
+    #---------------------------------------------
+    # new command
+    #---------------------------------------------
+    newParser = subParsers.add_parser('new',help = 'create a new ticket.')
+    for field in fields.values():
+        if not field.default or len(field.default) == 0:
+            helpStr = "%s"%(field.help)
+        else:
+            helpStr = "%s (defaults to %s)"%(field.help,field.default)
+        newParser.add_argument("--%s"%field.name,help = helpStr)
+    newParser.add_argument("--to-folder",help = "Add this ticket to the given"
+                                                "loaded folder")
+    newParser.add_argument('help',help = commandHelpMessage,nargs='?')
+    helpFunctions['new'] = newParser.print_help
 
     parseResults = parser.parse_args(args[1:])
     parseResults.helpFunctions = helpFunctions
@@ -130,10 +145,10 @@ def Main(args):
         #to pop them off.
         parseResults.pop('verbose')
         parseResults.pop('show_traceback')
-        gitTkt = gittkt.GitTkt(branch = parseResults.pop('branch'),
-                        non_interactive = parseResults.pop('non_interactive'),
+        gitTkt = GitTkt.GitTkt(branch = parseResults.pop('branch'),
+                        nonInteractive = parseResults.pop('non_interactive'),
                         save = parseResults.pop('save'),
-                        loadShelves = parseResults.pop('load_folders'),
+                        loadFolders = parseResults.pop('load_folders'),
                         fields = fields
                         )
         command = parseResults.pop('subcommand')
