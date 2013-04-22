@@ -164,7 +164,8 @@ class gitbook:
 
     def get_data(self):
         if self.data is None:
-            assert self.name is not None
+            if self.name is None:
+                raise ValueError("name and data re both None")
             self.data = self.deserialize_data(self.shelf.get_blob(self.name))
         return self.data
 
@@ -206,7 +207,11 @@ class gitshelve(dict):
 
     head = None
     dirty = False
-    objects = None
+    objects = {}
+    book_type = gitbook
+    branch = 'master'
+    repository = None
+    keep_history = True
 
     def __init__(self, branch='master', repository=None,
                  keep_history=True, book_type=gitbook):
@@ -256,7 +261,8 @@ class gitshelve(dict):
             if not line:
                 continue
             match = self.ls_tree_pat.match(line)
-            assert match
+            if not match:
+                raise ValueError("ls-tree went insane: %s" % line)
 
             treep = match.group(1) == "040000 tree"
             perm = match.group(2)
@@ -314,15 +320,18 @@ class gitshelve(dict):
                 continue
 
             obj = objects[path]
-            assert isinstance(obj, dict)
+            if not isinstance(obj, dict):
+                raise TypeError("objects['%s'] is not a dict"%path)
 
             if len(list(obj.keys())) == 1 and '__book__' in obj:
                 book = obj['__book__']
                 if book.dirty:
+                    #"""change_comment is alwyas None, so this block does nothing
                     if comment_accumulator:
                         comment = book.change_comment()
                         if comment:
                             comment_accumulator.write(comment)
+                    #"""
 
                     book.name = self.make_blob(book.serialize_data(book.data))
                     book.dirty = False
@@ -395,6 +404,8 @@ class gitshelve(dict):
             objects = self.objects
 
         if ('__root__' in objects) and indent == 0:
+            data = '%stree %s\n' % (" " * indent, objects['__root__'])
+            data.encode('utf-8')
             fd.write('%stree %s\n' % (" " * indent, objects['__root__']))
             indent += 2
 
@@ -403,7 +414,8 @@ class gitshelve(dict):
         for key in keys:
             if key == '__root__':
                 continue
-            assert isinstance(objects[key], dict)
+            if not isinstance(objects[key], dict):
+                raise TypeError("objects['%s'] is not a dict"%key)
 
             if ('__book__' in objects[key]):
                 book = objects[key]['__book__']
@@ -433,31 +445,6 @@ class gitshelve(dict):
                 d[part] = {}
             d = d[part]
         return d
-
-    def get(self, key):
-        path = '%s/%s' % (key[:2], key[2:])
-        d = None
-        try:
-            d = self.get_tree(path)
-        except KeyError:
-            raise KeyError(key)
-        if not d or not ('__book__' in d):
-            raise KeyError(key)
-        return d['__book__'].get_data()
-
-    def put(self, data):
-        book = self.book_type(self, '__unknown__')
-        book.data = data
-        book.name = self.make_blob(book.serialize_data(book.data))
-        book.dirty = False      # the blob was just written!
-        book.path = '%s/%s' % (book.name[:2], book.name[2:])
-
-        d = self.get_tree(book.path, make_dirs=True)
-        d.clear()
-        d['__book__'] = book
-        self.dirty = True
-
-        return book.name
 
     def __getitem__(self, path):
         d = None
@@ -511,7 +498,8 @@ class gitshelve(dict):
         for item in list(objects.items()):
             if item[0] == '__root__':
                 continue
-            assert isinstance(item[1], dict)
+            if not isinstance(item[1], dict):
+                raise TypeError("item[1] is not a dict")
 
             if path:
                 key = os.sep.join((path, item[0]))
@@ -525,7 +513,8 @@ class gitshelve(dict):
                 elif kind == 'values':
                     yield value
                 else:
-                    assert kind == 'items'
+                    if kind != 'items':
+                        raise ValueError("kind != keys, values, nor items")
                     yield (key, value)
             else:
                 for obj in self.walker(kind, item[1], key):
@@ -545,17 +534,23 @@ class gitshelve(dict):
             i.append(items)
         return i
 
+    def iterkeys(self):
+        return self.walker('keys', self.objects)
+
     def keys(self):
         k = []
         for key in self.iterkeys():
             k.append(key)
         return k
 
-    def iterkeys(self):
-        return self.walker('keys', self.objects)
-
     def itervalues(self):
         return self.walker('values', self.objects)
+
+    def values(self):
+        v = []
+        for value in self.itervalues():
+            v.append(value)
+        return v
 
     def __getstate__(self):
         self.sync()                   # synchronize before persisting
