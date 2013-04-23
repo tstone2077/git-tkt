@@ -40,12 +40,18 @@ class t_GitTktFolder(unittest.TestCase):
         shutil.rmtree(self.gitDir)
         self.stream.close()
 
+    def ClearStream(self):
+        self.stream.seek(0)
+        self.stream.truncate(0)
+
     def testAdd(self):
         ticketDataOld = {
             'field1' : 'data1',
             'field2' : 'data2',
             }
         ticketId = self.gitTktFolder.Add(ticketDataOld.copy())
+        self.assertIn('Added Ticket ',self.stream.getvalue())
+        self.ClearStream()
         #assert that the ticket was added to the shelf
         shelf = gitshelve.open(branch = self.branch)
         data = eval(shelf['active/%s'%ticketId])
@@ -68,6 +74,8 @@ class t_GitTktFolder(unittest.TestCase):
             'num'    : '1',
             }
         ticketId = self.gitTktFolder.Add(ticketDataNew)
+        self.assertIn('Added Ticket ',self.stream.getvalue())
+        self.ClearStream()
         #assert that the ticket was added to the shelf
         shelf = gitshelve.open(branch = self.branch)
         data = eval(shelf['active/%s'%ticketId])
@@ -80,6 +88,19 @@ class t_GitTktFolder(unittest.TestCase):
         data = shelf['active/%s'%GitTktFolder.GITTKT_NUM_MAP_FILE]
         ticketNumFile += "2\t%s\n"%ticketId
         self.assertEqual(str(data),ticketNumFile)
+
+    def testList(self):
+        ticketDataOld = {
+            'name' : 'name_data',
+            'author' : 'author_data',
+            }
+        ticketId = self.gitTktFolder.Add(ticketDataOld.copy())
+        self.ClearStream()
+        ticketId = self.gitTktFolder.List()
+        expectedOutput = '#  |           Ticket Name           |   Author  |\n'\
+                         '1  | name_data                       | author_da |\n'
+        self.assertIn(expectedOutput,self.stream.getvalue())
+        self.ClearStream()
 
 if __name__ == '__main__':
     unittest.main()

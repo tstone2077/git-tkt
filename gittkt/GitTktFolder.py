@@ -39,7 +39,8 @@ class GitTktFolder(object):
         self.name = name
         self.fields = fields
         self.branch = branch
-        if outstream is None:
+        self.outstream = outstream
+        if self.outstream is None:
             self.outstream = sys.stdout
 
     def __GetTicketIds(self,num):
@@ -258,6 +259,7 @@ class GitTktFolder(object):
         #store the new data in gitshelve
         self.__SaveToShelf(ticketId,ticketData,message)
         self.__AddToNumMap(ticketId)
+        self.outstream.write("Added Ticket %s"%ticketId)
         return ticketId
 
     def Show(self,ticketIds):
@@ -291,9 +293,9 @@ class GitTktFolder(object):
             return "No Tickets Found"
         #print the columns
         colData = ["#  |"]
-        for field in self.fields:
+        for field in self.fields.values():
             colSize = field.listColSize
-            if colSize > 0:
+            if colSize and colSize > 0:
                 returnData[field.title] = []
                 colStr = field.title[:colSize].center(colSize) + "|"
                 colData.append(colStr)
@@ -304,9 +306,9 @@ class GitTktFolder(object):
             num="%s"%(ticket[0])
             ticketData = self.__GetTicketData(ticket[0])
             rowData = [num.ljust(3) + "|"]
-            for field in self.fields:
+            for field in self.fields.values():
                 colSize = field.listColSize
-                if colSize > 0:
+                if colSize and colSize > 0:
                     returnData[field.title].append(ticketData[field.name])
                     if ticketData[field.name]:
                         rowData.append((" "+
