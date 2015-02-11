@@ -15,19 +15,20 @@ import gittktCLI
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class t_gittktCLI(unittest.TestCase):
+    wroteConfig = False
+    config = None
+
     def setUp(self):
-        # use environment variables to set author and committer.
-        # using the config didn't work in travis-ci.org.
-        os.environ["GIT_AUTHOR_NAME"] = "John Doe"
-        os.environ["GIT_AUTHOR_EMAIL"] = "doe.j@example"
-        os.environ["GIT_COMMITTER_NAME"] = "John Doe"
-        os.environ["GIT_COMMITTER_EMAIL"] = "doe.j@example"
+        self.config = os.path.join(os.path.expanduser("~"),".gitconfig")
+        if not os.path.isfile(self.config):
+            self.wroteConfig = True
+            gitshelve.git("config","user.name","John Doe"),
+            gitshelve.git("config","user.email","John@Doe"),
 
     def tearDown(self):
-        del os.environ["GIT_AUTHOR_NAME"]
-        del os.environ["GIT_AUTHOR_EMAIL"]
-        del os.environ["GIT_COMMITTER_NAME"]
-        del os.environ["GIT_COMMITTER_EMAIL"]
+        if self.wroteConfig:
+            os.unlink(self.config)
+            self.wroteConfig = False
 
     def testParseArgs(self):
         args = ['name', '--verbose','debug', '--load-fields-file',
