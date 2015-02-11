@@ -1,9 +1,6 @@
 """
     gittkt library.  See README for more information
 """
-#construction of the version information
-GITTKT_VERSION="0.1.0"
-GITTKT_DEFAULT_BRANCH='git-tkt'
 
 from collections import OrderedDict
 import gitshelve
@@ -11,6 +8,7 @@ import pickle
 import re
 import sys
 from GitTktCache import GitTktCache
+from GitTktDefines import *
 from xml.etree import ElementTree
 
 LS_TREE_RE = re.compile('((\d{6}) (tree|blob)) ([0-9a-f]{40})\t(start|(.+))$')

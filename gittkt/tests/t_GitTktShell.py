@@ -2,7 +2,7 @@
 
 import os
 import sys
-import t_gitshelve
+#import t_gitshelve
 import unittest
 
 dirName = os.path.dirname(__file__)

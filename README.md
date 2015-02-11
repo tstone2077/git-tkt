@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/tstone2077/git-tkt.svg?branch=develop)](https://travis-ci.org/tstone2077/git-tkt)
+[![Coverage Status](https://coveralls.io/repos/tstone2077/git-tkt/badge.svg)](https://coveralls.io/r/tstone2077/git-tkt)
+
 gittkt is a python based distributed ticketing system.  It was inspired by
 the work done within git-issue and git-issius.
 

@@ -1,6 +1,6 @@
 import os
 from setuptools import setup, find_packages
-from gittkt.gittkt import GITTKT_VERSION
+from gittkt.GitTktDefines import GITTKT_VERSION
 
 setup(
     url = "",
@@ -9,8 +9,11 @@ setup(
     name = 'git-tkt',
     version = GITTKT_VERSION,
     description = "Distributed bug tracking for Git.",
+    test_suite = "gittkt.tests",
     keywords = "bug, tracking, git, distributed",
     packages = find_packages(exclude=["t_*"]),
+    install_requires = ['gitshelve>=0.1.1'],
+    tests_require = ['gitshelve>=0.1.1'],
     classifiers = [
         "Topic :: Software Development :: Bug Tracking",
         "Development Status :: 2 - Pre-Alpha",
