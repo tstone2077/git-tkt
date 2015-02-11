@@ -16,10 +16,18 @@ SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class t_gittktCLI(unittest.TestCase):
     def setUp(self):
-        pass
+        # use environment variables to set author and committer.
+        # using the config didn't work in travis-ci.org.
+        os.environ["GIT_AUTHOR_NAME"] = "John Doe"
+        os.environ["GIT_AUTHOR_EMAIL"] = "doe.j@example"
+        os.environ["GIT_COMMITTER_NAME"] = "John Doe"
+        os.environ["GIT_COMMITTER_EMAIL"] = "doe.j@example"
 
     def tearDown(self):
-        pass
+        del os.environ["GIT_AUTHOR_NAME"]
+        del os.environ["GIT_AUTHOR_EMAIL"]
+        del os.environ["GIT_COMMITTER_NAME"]
+        del os.environ["GIT_COMMITTER_EMAIL"]
 
     def testParseArgs(self):
         args = ['name', '--verbose','debug', '--load-fields-file',

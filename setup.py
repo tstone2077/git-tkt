@@ -21,8 +21,5 @@ setup(
     entry_points = {
         'console_scripts': ['git-tkt = gittkt.gittktCLI:EntryPoint']
         },
-    data_files = [
-        ('git-tkt',['LICENSE','LICENSE.gitshelve','README'])
-        ],
     )
 
